@@ -13,11 +13,18 @@ const text = (value: unknown) => ({
 
 const UI_RESOURCE_URI = "ui://neuphlo/mcp-template/main.html";
 const UI_MIME_TYPE = "text/html;profile=mcp-app";
+const UI_RESOURCE_URI_LEGACY_META_KEY = "ui/resourceUri";
+
+const uiToolMeta = {
+  ui: { resourceUri: UI_RESOURCE_URI },
+  [UI_RESOURCE_URI_LEGACY_META_KEY]: UI_RESOURCE_URI,
+};
 
 async function readDashboardHtml(): Promise<string> {
   const configured = process.env.NEUPHLO_MCP_UI_PATH;
   const candidates = [
     configured,
+    path.resolve(import.meta.dirname, "ui/index.html"),
     path.resolve(import.meta.dirname, "../ui/index.html"),
     path.resolve(process.cwd(), "dist/ui/index.html"),
   ].filter((candidate): candidate is string => Boolean(candidate));
@@ -134,7 +141,7 @@ export function buildMcpServer(repository: MarkdownRepository, writeMode: "reado
         since: z.string().optional().describe("Inclusive YYYY-MM-DD updated-date filter."),
       }),
       annotations: { readOnlyHint: true },
-      _meta: { ui: { resourceUri: UI_RESOURCE_URI } },
+      _meta: uiToolMeta,
     },
     async ({ audience, since }) => {
       const records = await repository.search({ since, limit: 100 });
@@ -184,7 +191,7 @@ export function buildMcpServer(repository: MarkdownRepository, writeMode: "reado
         limit: z.number().int().min(1).max(100).default(50),
       }),
       annotations: { readOnlyHint: true },
-      _meta: { ui: { resourceUri: UI_RESOURCE_URI } },
+      _meta: uiToolMeta,
     },
     async ({ query, types, statuses, audience, domains, since, limit }) => {
       const records = await repository.search({ query, types, statuses, domains, since, limit });

@@ -37,6 +37,7 @@ MCP_APP_NAME=Your Application Name
 MCP_CONTENT_DIR=./content
 NEUPHLO_MCP_WRITE_MODE=direct
 NEUPHLO_MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],neuphlo-mcp
+NEUPHLO_MCP_AUTH_TOKEN=
 ```
 
 `MCP_APP_NAME` is the visible customer/application name. Changing it does not change stable MCP identifiers.
@@ -44,6 +45,8 @@ NEUPHLO_MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],neuphlo-mcp
 `MCP_CONTENT_DIR` is the host directory mounted into the container. It accepts a repository-relative path such as `./content` or an absolute path such as `/srv/company-knowledge`. Record types are routed to subfolders inside that directory; see [`content/README.md`](content/README.md).
 
 Use `NEUPHLO_MCP_WRITE_MODE=readonly` when a deployment should expose only read tools. The example write tools remain discoverable but return an error instead of changing Markdown.
+
+`NEUPHLO_MCP_AUTH_TOKEN` gates every route except `/healthz` behind `Authorization: Bearer <token>`. Set it whenever the endpoint leaves loopback. It is a single shared secret, so treat it as the outer door rather than as per-user authorization.
 
 Apply environment changes with:
 

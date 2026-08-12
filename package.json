@@ -5,11 +5,12 @@
   "type": "module",
   "description": "The Neuphlo MCP template with Docker, Markdown storage, MCP Apps, and connector examples.",
   "scripts": {
-    "build": "tsc -p tsconfig.json && npm run build:ui",
+    "build": "tsc -p tsconfig.build.json && npm run build:ui",
     "build:ui": "vite build",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "smoke": "tsx scripts/smoke.ts",
+    "pretest": "npm run build:ui",
     "test": "node --import tsx --test test/**/*.test.ts",
     "check": "tsc -p tsconfig.json --noEmit"
   },

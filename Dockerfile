@@ -1,7 +1,7 @@
 FROM node:24-alpine AS build
 WORKDIR /app
 
-COPY package.json package-lock.json tsconfig.json ./
+COPY package.json package-lock.json tsconfig.json tsconfig.build.json ./
 RUN npm ci
 
 COPY src ./src
@@ -27,8 +27,7 @@ RUN addgroup -S mcp && adduser -S -G mcp -u 10001 mcp
 
 COPY --from=build --chown=mcp:mcp /app/package.json ./package.json
 COPY --from=build --chown=mcp:mcp /app/node_modules ./node_modules
-COPY --from=build --chown=mcp:mcp /app/dist/src ./dist
-COPY --from=build --chown=mcp:mcp /app/dist/ui ./ui
+COPY --from=build --chown=mcp:mcp /app/dist ./dist
 COPY --chown=mcp:mcp CUSTOMIZING.md ./CUSTOMIZING.md
 COPY --chown=mcp:mcp README.md ./README.md
 COPY --chown=mcp:mcp CHANGELOG.md ./CHANGELOG.md

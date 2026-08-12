@@ -1,11 +1,17 @@
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
 import { readFile } from "node:fs/promises";
+import { createHash, timingSafeEqual } from "node:crypto";
 import path from "node:path";
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { hostHeaderValidation, originValidation, toNodeHandler } from "@modelcontextprotocol/node";
 import { buildMcpServer } from "./server.js";
 import { MarkdownRepository } from "./repository.js";
 import { TEMPLATE_NAME, TEMPLATE_VERSION } from "./version.js";
+
+const envFile = path.resolve(process.cwd(), process.env.MCP_ENV_FILE ?? ".env");
+try {
+  process.loadEnvFile(envFile);
+} catch {}
 
 const port = Number.parseInt(process.env.PORT ?? "3000", 10);
 const host = process.env.HOST ?? "0.0.0.0";
@@ -18,6 +24,18 @@ const allowedHosts = (process.env.NEUPHLO_MCP_ALLOWED_HOSTS ?? "localhost,127.0.
   .filter(Boolean);
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Invalid PORT: ${process.env.PORT}`);
+
+const authToken = process.env.NEUPHLO_MCP_AUTH_TOKEN?.trim() ?? "";
+const authTokenDigest = authToken ? createHash("sha256").update(authToken).digest() : undefined;
+
+function isAuthorized(req: IncomingMessage): boolean {
+  if (!authTokenDigest) return true;
+  const header = req.headers.authorization ?? "";
+  if (!header.startsWith("Bearer ")) return false;
+  const presented = header.slice("Bearer ".length).trim();
+  if (!presented) return false;
+  return timingSafeEqual(createHash("sha256").update(presented).digest(), authTokenDigest);
+}
 
 function escapeHtml(value: string): string {
   return value
@@ -113,6 +131,14 @@ const browserHelp = `<!doctype html>
 </main></body></html>`;
 
 const httpServer = createServer(async (req, res) => {
+  if (req.url !== "/healthz" && !isAuthorized(req)) {
+    res.writeHead(401, {
+      "content-type": "application/json",
+      "www-authenticate": 'Bearer realm="mcp"',
+    });
+    res.end(JSON.stringify({ error: "unauthorized" }));
+    return;
+  }
   const acceptsHtml = req.headers.accept?.includes("text/html") ?? false;
   if ((req.url === "/" || req.url === "/mcp") && req.method === "GET" && acceptsHtml) {
     res.writeHead(200, {
@@ -156,6 +182,7 @@ const httpServer = createServer(async (req, res) => {
 httpServer.listen(port, host, () => {
   console.log(`${appName} MCP listening on http://${host}:${port}/mcp`);
   console.log(`Content root: ${contentRoot}; write mode: ${writeMode}`);
+  console.log(authTokenDigest ? "Auth: bearer token required" : "Auth: disabled (no NEUPHLO_MCP_AUTH_TOKEN set)");
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
