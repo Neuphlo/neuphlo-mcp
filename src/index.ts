@@ -44,9 +44,8 @@ function routeOf(url: string | undefined): string {
   return queryStart === -1 ? raw : raw.slice(0, queryStart);
 }
 
-function logRequest(req: IncomingMessage, res: ServerResponse): void {
+function logRequest(req: IncomingMessage, res: ServerResponse, route: string): void {
   const startedAt = performance.now();
-  const route = routeOf(req.url);
   const from = logClientIps ? ` from ${req.socket.remoteAddress ?? "unknown"}` : "";
   const elapsed = () => `${Math.round(performance.now() - startedAt)}ms`;
   res.on("finish", () => {
@@ -158,8 +157,9 @@ const browserHelp = `<!doctype html>
 </main></body></html>`;
 
 const httpServer = createServer(async (req, res) => {
-  logRequest(req, res);
-  const localHealthCheck = req.url === "/healthz" && isLoopback(req);
+  const route = routeOf(req.url);
+  logRequest(req, res, route);
+  const localHealthCheck = route === "/healthz" && isLoopback(req);
   if (!localHealthCheck && !isAuthorized(req)) {
     res.writeHead(401, {
       "content-type": "application/json",
@@ -169,7 +169,7 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
   const acceptsHtml = req.headers.accept?.includes("text/html") ?? false;
-  if ((req.url === "/" || req.url === "/mcp") && req.method === "GET" && acceptsHtml) {
+  if ((route === "/" || route === "/mcp") && req.method === "GET" && acceptsHtml) {
     res.writeHead(200, {
       "content-type": "text/html; charset=utf-8",
       "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
@@ -178,8 +178,8 @@ const httpServer = createServer(async (req, res) => {
     res.end(browserHelp);
     return;
   }
-  if (req.method === "GET" && req.url && documentationRoutes[req.url]) {
-    const documentationPath = documentationRoutes[req.url];
+  if (req.method === "GET" && documentationRoutes[route]) {
+    const documentationPath = documentationRoutes[route];
     try {
       const markdown = await readFile(documentationPath, "utf8");
       res.writeHead(200, {
@@ -194,12 +194,12 @@ const httpServer = createServer(async (req, res) => {
     }
     return;
   }
-  if (req.url === "/healthz") {
+  if (route === "/healthz") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ status: "ok", name: TEMPLATE_NAME, version: TEMPLATE_VERSION, writeMode }));
     return;
   }
-  if (req.url !== "/mcp") {
+  if (route !== "/mcp") {
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not_found" }));
     return;
