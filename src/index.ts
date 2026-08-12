@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { createHash, timingSafeEqual } from "node:crypto";
 import path from "node:path";
@@ -25,6 +25,7 @@ const allowedHosts = (process.env.NEUPHLO_MCP_ALLOWED_HOSTS ?? "localhost,127.0.
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Invalid PORT: ${process.env.PORT}`);
 
+const logClientIps = process.env.NEUPHLO_MCP_LOG_IPS === "true";
 const authToken = process.env.NEUPHLO_MCP_AUTH_TOKEN?.trim() ?? "";
 const authTokenDigest = authToken ? createHash("sha256").update(authToken).digest() : undefined;
 
@@ -35,6 +36,27 @@ function isAuthorized(req: IncomingMessage): boolean {
   const presented = header.slice("Bearer ".length).trim();
   if (!presented) return false;
   return timingSafeEqual(createHash("sha256").update(presented).digest(), authTokenDigest);
+}
+
+function routeOf(url: string | undefined): string {
+  const raw = url ?? "";
+  const queryStart = raw.indexOf("?");
+  return queryStart === -1 ? raw : raw.slice(0, queryStart);
+}
+
+function logRequest(req: IncomingMessage, res: ServerResponse): void {
+  const startedAt = performance.now();
+  const route = routeOf(req.url);
+  const from = logClientIps ? ` from ${req.socket.remoteAddress ?? "unknown"}` : "";
+  const elapsed = () => `${Math.round(performance.now() - startedAt)}ms`;
+  res.on("finish", () => {
+    console.log(`${req.method} ${route} ${res.statusCode} ${elapsed()}${from}`);
+  });
+  res.on("close", () => {
+    if (!res.writableEnded) {
+      console.log(`${req.method} ${route} CLOSED-WITHOUT-RESPONSE ${elapsed()}${from}`);
+    }
+  });
 }
 
 function isLoopback(req: IncomingMessage): boolean {
@@ -136,6 +158,7 @@ const browserHelp = `<!doctype html>
 </main></body></html>`;
 
 const httpServer = createServer(async (req, res) => {
+  logRequest(req, res);
   const localHealthCheck = req.url === "/healthz" && isLoopback(req);
   if (!localHealthCheck && !isAuthorized(req)) {
     res.writeHead(401, {
