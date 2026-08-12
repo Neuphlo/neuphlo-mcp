@@ -1,4 +1,4 @@
-import { createServer, type IncomingMessage } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { createHash, timingSafeEqual } from "node:crypto";
 import path from "node:path";
@@ -25,6 +25,7 @@ const allowedHosts = (process.env.NEUPHLO_MCP_ALLOWED_HOSTS ?? "localhost,127.0.
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Invalid PORT: ${process.env.PORT}`);
 
+const logClientIps = process.env.NEUPHLO_MCP_LOG_IPS === "true";
 const authToken = process.env.NEUPHLO_MCP_AUTH_TOKEN?.trim() ?? "";
 const authTokenDigest = authToken ? createHash("sha256").update(authToken).digest() : undefined;
 
@@ -35,6 +36,26 @@ function isAuthorized(req: IncomingMessage): boolean {
   const presented = header.slice("Bearer ".length).trim();
   if (!presented) return false;
   return timingSafeEqual(createHash("sha256").update(presented).digest(), authTokenDigest);
+}
+
+function routeOf(url: string | undefined): string {
+  const raw = url ?? "";
+  const queryStart = raw.indexOf("?");
+  return queryStart === -1 ? raw : raw.slice(0, queryStart);
+}
+
+function logRequest(req: IncomingMessage, res: ServerResponse, route: string): void {
+  const startedAt = performance.now();
+  const from = logClientIps ? ` from ${req.socket.remoteAddress ?? "unknown"}` : "";
+  const elapsed = () => `${Math.round(performance.now() - startedAt)}ms`;
+  res.on("finish", () => {
+    console.log(`${req.method} ${route} ${res.statusCode} ${elapsed()}${from}`);
+  });
+  res.on("close", () => {
+    if (!res.writableEnded) {
+      console.log(`${req.method} ${route} CLOSED-WITHOUT-RESPONSE ${elapsed()}${from}`);
+    }
+  });
 }
 
 function isLoopback(req: IncomingMessage): boolean {
@@ -136,7 +157,9 @@ const browserHelp = `<!doctype html>
 </main></body></html>`;
 
 const httpServer = createServer(async (req, res) => {
-  const localHealthCheck = req.url === "/healthz" && isLoopback(req);
+  const route = routeOf(req.url);
+  logRequest(req, res, route);
+  const localHealthCheck = route === "/healthz" && isLoopback(req);
   if (!localHealthCheck && !isAuthorized(req)) {
     res.writeHead(401, {
       "content-type": "application/json",
@@ -146,7 +169,7 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
   const acceptsHtml = req.headers.accept?.includes("text/html") ?? false;
-  if ((req.url === "/" || req.url === "/mcp") && req.method === "GET" && acceptsHtml) {
+  if ((route === "/" || route === "/mcp") && req.method === "GET" && acceptsHtml) {
     res.writeHead(200, {
       "content-type": "text/html; charset=utf-8",
       "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
@@ -155,8 +178,8 @@ const httpServer = createServer(async (req, res) => {
     res.end(browserHelp);
     return;
   }
-  if (req.method === "GET" && req.url && documentationRoutes[req.url]) {
-    const documentationPath = documentationRoutes[req.url];
+  if (req.method === "GET" && documentationRoutes[route]) {
+    const documentationPath = documentationRoutes[route];
     try {
       const markdown = await readFile(documentationPath, "utf8");
       res.writeHead(200, {
@@ -171,12 +194,12 @@ const httpServer = createServer(async (req, res) => {
     }
     return;
   }
-  if (req.url === "/healthz") {
+  if (route === "/healthz") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ status: "ok", name: TEMPLATE_NAME, version: TEMPLATE_VERSION, writeMode }));
     return;
   }
-  if (req.url !== "/mcp") {
+  if (route !== "/mcp") {
     res.writeHead(404, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "not_found" }));
     return;

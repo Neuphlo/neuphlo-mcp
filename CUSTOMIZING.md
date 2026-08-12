@@ -38,6 +38,7 @@ MCP_CONTENT_DIR=./content
 NEUPHLO_MCP_WRITE_MODE=direct
 NEUPHLO_MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],neuphlo-mcp
 NEUPHLO_MCP_AUTH_TOKEN=
+NEUPHLO_MCP_LOG_IPS=false
 ```
 
 `MCP_APP_NAME` is the visible customer/application name. Changing it does not change stable MCP identifiers.
@@ -47,6 +48,8 @@ NEUPHLO_MCP_AUTH_TOKEN=
 Use `NEUPHLO_MCP_WRITE_MODE=readonly` when a deployment should expose only read tools. The example write tools remain discoverable but return an error instead of changing Markdown.
 
 `NEUPHLO_MCP_AUTH_TOKEN` gates every route behind `Authorization: Bearer <token>`, with `/healthz` exempt only for loopback callers so the container health check keeps working. Set it whenever the endpoint leaves loopback. It is a single shared secret, so treat it as the outer door rather than as per-user authorization.
+
+Every request is logged as one line: method, path, status, and duration. Query strings are stripped so a credential passed as a parameter cannot reach the log, and headers and bodies are never logged. Client IP addresses are omitted unless `NEUPHLO_MCP_LOG_IPS=true`, since on a public deployment they are personal data and the retention policy is the operator's to choose.
 
 Apply environment changes with:
 
