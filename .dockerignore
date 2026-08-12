@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+node_modules
+dist
+coverage
+test
+scripts
+content/inbox/*.md
+content/customer-insights/*.md
+content/decisions/*.md
+content/initiatives/*.md
+content/releases/*.md
+content/briefs/*.md

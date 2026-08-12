@@ -1,0 +1,19 @@
+services:
+  neuphlo-mcp:
+    image: neuphlo-mcp-template:0.1.0
+    build:
+      context: .
+    ports:
+      - "127.0.0.1:${MCP_PORT:-3000}:3000"
+    environment:
+      MCP_APP_NAME: ${MCP_APP_NAME:-Documentation}
+      NEUPHLO_MCP_CONTENT_ROOT: /data/content
+      NEUPHLO_MCP_WRITE_MODE: ${NEUPHLO_MCP_WRITE_MODE:-direct}
+      NEUPHLO_MCP_ALLOWED_HOSTS: ${NEUPHLO_MCP_ALLOWED_HOSTS:-localhost,127.0.0.1,[::1],neuphlo-mcp}
+      INTERCOM_ACCESS_TOKEN: ${INTERCOM_ACCESS_TOKEN:-}
+      HUBSPOT_ACCESS_TOKEN: ${HUBSPOT_ACCESS_TOKEN:-}
+      CHARGEBEE_SITE: ${CHARGEBEE_SITE:-}
+      CHARGEBEE_API_KEY: ${CHARGEBEE_API_KEY:-}
+    volumes:
+      - ${MCP_CONTENT_DIR:-./content}:/data/content
+    restart: unless-stopped

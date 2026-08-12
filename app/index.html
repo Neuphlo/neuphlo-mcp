@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Documentation</title>
+    <script type="module" src="./src.ts"></script>
+  </head>
+  <body>
+    <main id="dashboard-view" class="shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Workspace</p>
+          <h1>Documentation</h1>
+          <p class="subtitle">An example Markdown workflow with resources, tools, connectors, and inline MCP App views.</p>
+        </div>
+        <div class="connection"><span></span><strong id="connection-label">Connecting</strong></div>
+      </header>
+
+      <section class="controls" aria-label="Dashboard filters">
+        <label>
+          Audience
+          <select id="audience">
+            <option value="all">Everyone</option>
+            <option value="support">Support</option>
+            <option value="sales">Sales</option>
+            <option value="marketing">Marketing</option>
+            <option value="product">Product</option>
+            <option value="engineering">Engineering</option>
+            <option value="leadership">Leadership</option>
+          </select>
+        </label>
+        <label>
+          Changed since
+          <input id="since" type="date" />
+        </label>
+        <label class="search-label">
+          Find
+          <input id="query" type="search" placeholder="Search titles, IDs, and summaries" />
+        </label>
+        <button id="refresh" class="button secondary" type="button">Refresh</button>
+      </section>
+
+      <section id="stats" class="stats" aria-label="Knowledge summary"></section>
+
+      <div class="layout">
+        <section class="panel records-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Knowledge</p>
+              <h2>Recently changed</h2>
+            </div>
+            <span id="record-count" class="count"></span>
+          </div>
+          <div id="records" class="records" aria-live="polite"></div>
+        </section>
+
+        <aside class="side-stack">
+          <section class="panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Sources</p>
+                <h2>Connectors</h2>
+              </div>
+            </div>
+            <div id="connectors" class="connectors"></div>
+          </section>
+
+          <section class="panel capture-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Capture</p>
+                <h2>New signal</h2>
+              </div>
+            </div>
+            <form id="signal-form">
+              <label>Title<input name="title" required minlength="3" maxlength="140" placeholder="What did we observe?" /></label>
+              <label>Summary<textarea name="summary" required minlength="3" maxlength="5000" rows="4" placeholder="Keep facts separate from interpretation"></textarea></label>
+              <div class="form-row">
+                <label>Source<select name="sourceType"><option>support</option><option>sales</option><option>marketing</option><option>research</option><option>internal</option></select></label>
+                <label>Owner<input name="owner" required value="workspace-owner" /></label>
+              </div>
+              <button class="button primary" type="submit">Add to triage</button>
+              <p id="form-status" class="form-status" role="status"></p>
+            </form>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <section id="table-view" class="shell table-view" hidden>
+      <header class="table-hero">
+        <div>
+          <p class="eyebrow">Workspace</p>
+          <h1 id="table-title">Knowledge records</h1>
+          <p id="table-description" class="subtitle"></p>
+        </div>
+        <span id="table-count" class="table-count"></span>
+      </header>
+      <div class="table-card">
+        <div class="table-scroll">
+          <table>
+            <thead id="table-head"></thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+        <div id="table-empty" class="empty" hidden><strong>No matching records</strong><span>Adjust the request or remove a filter.</span></div>
+      </div>
+    </section>
+  </body>
+</html>
