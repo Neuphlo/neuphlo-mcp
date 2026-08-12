@@ -37,6 +37,11 @@ function isAuthorized(req: IncomingMessage): boolean {
   return timingSafeEqual(createHash("sha256").update(presented).digest(), authTokenDigest);
 }
 
+function isLoopback(req: IncomingMessage): boolean {
+  const address = req.socket.remoteAddress ?? "";
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+}
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -131,7 +136,8 @@ const browserHelp = `<!doctype html>
 </main></body></html>`;
 
 const httpServer = createServer(async (req, res) => {
-  if (req.url !== "/healthz" && !isAuthorized(req)) {
+  const localHealthCheck = req.url === "/healthz" && isLoopback(req);
+  if (!localHealthCheck && !isAuthorized(req)) {
     res.writeHead(401, {
       "content-type": "application/json",
       "www-authenticate": 'Bearer realm="mcp"',

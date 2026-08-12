@@ -46,7 +46,7 @@ NEUPHLO_MCP_AUTH_TOKEN=
 
 Use `NEUPHLO_MCP_WRITE_MODE=readonly` when a deployment should expose only read tools. The example write tools remain discoverable but return an error instead of changing Markdown.
 
-`NEUPHLO_MCP_AUTH_TOKEN` gates every route except `/healthz` behind `Authorization: Bearer <token>`. Set it whenever the endpoint leaves loopback. It is a single shared secret, so treat it as the outer door rather than as per-user authorization.
+`NEUPHLO_MCP_AUTH_TOKEN` gates every route behind `Authorization: Bearer <token>`, with `/healthz` exempt only for loopback callers so the container health check keeps working. Set it whenever the endpoint leaves loopback. It is a single shared secret, so treat it as the outer door rather than as per-user authorization.
 
 Apply environment changes with:
 

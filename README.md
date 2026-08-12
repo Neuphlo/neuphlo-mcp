@@ -60,7 +60,9 @@ The server reads `.env` itself, so `npm run dev` and `npm start` pick up the sam
 
 ## Bearer token authentication
 
-Set `NEUPHLO_MCP_AUTH_TOKEN` to require `Authorization: Bearer <token>` on every route except `/healthz`, which stays open for the container health check. Unauthenticated requests get a `401` with a `WWW-Authenticate` header, and the token is compared as a SHA-256 digest so the check does not leak length or content through timing.
+Set `NEUPHLO_MCP_AUTH_TOKEN` to require `Authorization: Bearer <token>` on every route. Unauthenticated requests get a `401` with a `WWW-Authenticate` header, and the token is compared as a SHA-256 digest so the check does not leak length or content through timing.
+
+`/healthz` is the one exception, and only from loopback: the container health check reaches it over `127.0.0.1` inside the container, while proxied and published traffic arrives from the bridge network and still needs the token. An exposed deployment therefore reveals nothing through the health endpoint.
 
 ```bash
 openssl rand -hex 32
