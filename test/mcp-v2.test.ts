@@ -36,6 +36,7 @@ test("serves tools over the modern MCP 2026-07-28 protocol", async (t) => {
   const hubTool = tools.tools.find((tool) => tool.name === "open_neuphlo_dashboard");
   assert.deepEqual(hubTool?._meta, {
     ui: { resourceUri: "ui://neuphlo/mcp-template/main.html" },
+    "ui/resourceUri": "ui://neuphlo/mcp-template/main.html",
   });
 
   const resources = await client.listResources();

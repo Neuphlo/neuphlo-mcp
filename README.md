@@ -56,6 +56,20 @@ npm run smoke
 
 Stop the stack with `docker compose down`. For development without Docker, run `npm install` followed by `npm run dev`.
 
+The server reads `.env` itself, so `npm run dev` and `npm start` pick up the same file Compose uses. Real environment variables take precedence over the file, and `MCP_ENV_FILE` points at a different one.
+
+## Bearer token authentication
+
+Set `NEUPHLO_MCP_AUTH_TOKEN` to require `Authorization: Bearer <token>` on every route except `/healthz`, which stays open for the container health check. Unauthenticated requests get a `401` with a `WWW-Authenticate` header, and the token is compared as a SHA-256 digest so the check does not leak length or content through timing.
+
+```bash
+openssl rand -hex 32
+```
+
+Leave the variable empty and the server accepts every request, which is only appropriate for a loopback-bound development run. Set it before putting the endpoint on any network. `npm run smoke` reads the same variable and sends the header for you.
+
+A single shared token authenticates the caller but says nothing about which records they may read. Per-user identity and record-level authorization still have to be added before real data goes in.
+
 ## Starter capabilities
 
 - MCP Apps: `open_neuphlo_dashboard` returns the example dashboard and `show_knowledge_table` returns a result-specific inline table.
