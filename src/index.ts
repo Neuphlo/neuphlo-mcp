@@ -26,16 +26,26 @@ const allowedHosts = (process.env.MCP_ALLOWED_HOSTS ?? "localhost,127.0.0.1,[::1
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Invalid PORT: ${process.env.PORT}`);
 
 const logClientIps = process.env.MCP_LOG_IPS === "true";
-const authToken = process.env.MCP_AUTH_TOKEN?.trim() ?? "";
-const authTokenDigest = authToken ? createHash("sha256").update(authToken).digest() : undefined;
+const writeToken = process.env.MCP_WRITE_TOKEN?.trim() || process.env.MCP_AUTH_TOKEN?.trim() || "";
+const readToken = process.env.MCP_READ_TOKEN?.trim() ?? "";
+const writeTokenDigest = writeToken ? createHash("sha256").update(writeToken).digest() : undefined;
+const readTokenDigest = readToken ? createHash("sha256").update(readToken).digest() : undefined;
+const authenticationEnabled = Boolean(writeTokenDigest || readTokenDigest);
 
-function isAuthorized(req: IncomingMessage): boolean {
-  if (!authTokenDigest) return true;
+if (writeTokenDigest && readTokenDigest && timingSafeEqual(writeTokenDigest, readTokenDigest)) {
+  throw new Error("MCP_READ_TOKEN and MCP_WRITE_TOKEN must be different.");
+}
+
+function requestAccess(req: IncomingMessage): "read" | "write" | undefined {
+  if (!authenticationEnabled) return "write";
   const header = req.headers.authorization ?? "";
-  if (!header.startsWith("Bearer ")) return false;
+  if (!header.startsWith("Bearer ")) return undefined;
   const presented = header.slice("Bearer ".length).trim();
-  if (!presented) return false;
-  return timingSafeEqual(createHash("sha256").update(presented).digest(), authTokenDigest);
+  if (!presented) return undefined;
+  const digest = createHash("sha256").update(presented).digest();
+  if (writeTokenDigest && timingSafeEqual(digest, writeTokenDigest)) return "write";
+  if (readTokenDigest && timingSafeEqual(digest, readTokenDigest)) return "read";
+  return undefined;
 }
 
 function routeOf(url: string | undefined): string {
@@ -75,8 +85,12 @@ function escapeHtml(value: string): string {
 const repository = new MarkdownRepository(contentRoot);
 await repository.ensureLayout();
 
-const mcpHandler = createMcpHandler(() => buildMcpServer(repository, writeMode));
-const nodeMcpHandler = toNodeHandler(mcpHandler, {
+const writeMcpHandler = createMcpHandler(() => buildMcpServer(repository, writeMode, "write"));
+const readMcpHandler = createMcpHandler(() => buildMcpServer(repository, writeMode, "read"));
+const nodeWriteMcpHandler = toNodeHandler(writeMcpHandler, {
+  onerror: (error) => console.error("MCP adapter error", error),
+});
+const nodeReadMcpHandler = toNodeHandler(readMcpHandler, {
   onerror: (error) => console.error("MCP adapter error", error),
 });
 const validateHost = hostHeaderValidation(allowedHosts);
@@ -160,7 +174,8 @@ const httpServer = createServer(async (req, res) => {
   const route = routeOf(req.url);
   logRequest(req, res, route);
   const localHealthCheck = route === "/healthz" && isLoopback(req);
-  if (!localHealthCheck && !isAuthorized(req)) {
+  const access = localHealthCheck ? "read" : requestAccess(req);
+  if (!access) {
     res.writeHead(401, {
       "content-type": "application/json",
       "www-authenticate": 'Bearer realm="mcp"',
@@ -205,18 +220,19 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
   if (!validateHost(req, res) || !validateOrigin(req, res)) return;
-  await nodeMcpHandler(req, res);
+  await (access === "write" ? nodeWriteMcpHandler : nodeReadMcpHandler)(req, res);
 });
 
 httpServer.listen(port, host, () => {
   console.log(`${appName} MCP listening on http://${host}:${port}/mcp`);
   console.log(`Content root: ${contentRoot}; write mode: ${writeMode}`);
-  console.log(authTokenDigest ? "Auth: bearer token required" : "Auth: disabled (no MCP_AUTH_TOKEN set)");
+  console.log(authenticationEnabled ? `Auth: scoped bearer tokens (${readTokenDigest ? "read" : "no read token"}, ${writeTokenDigest ? "write" : "no write token"})` : "Auth: disabled (no bearer tokens set)");
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
-    mcpHandler.close();
+    readMcpHandler.close();
+    writeMcpHandler.close();
     httpServer.close(() => process.exit(0));
   });
 }

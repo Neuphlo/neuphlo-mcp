@@ -10,6 +10,8 @@ services:
       MCP_CONTENT_ROOT: /data/content
       MCP_WRITE_MODE: ${MCP_WRITE_MODE:-direct}
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1,[::1],knowledge-mcp}
+      MCP_READ_TOKEN: ${MCP_READ_TOKEN:-}
+      MCP_WRITE_TOKEN: ${MCP_WRITE_TOKEN:-}
       MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-}
       MCP_LOG_IPS: ${MCP_LOG_IPS:-false}
       INTERCOM_ACCESS_TOKEN: ${INTERCOM_ACCESS_TOKEN:-}

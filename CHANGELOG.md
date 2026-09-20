@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add distinct read-only and read/write bearer credentials with server-enforced tool visibility.
+
 ## 0.2.0 — 2026-09-20
 
 - Replace product-specific tools, views, URIs, environment variables, prompts, and examples with a neutral knowledge-workspace contract.

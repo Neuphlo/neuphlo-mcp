@@ -62,8 +62,13 @@ function recordSummary(record: Awaited<ReturnType<MarkdownRepository["listRecord
   };
 }
 
-export function buildMcpServer(repository: MarkdownRepository, writeMode: "readonly" | "direct"): McpServer {
+export function buildMcpServer(
+  repository: MarkdownRepository,
+  writeMode: "readonly" | "direct",
+  access: "read" | "write" = "write",
+): McpServer {
   const appName = process.env.MCP_APP_NAME?.trim() || "Documentation";
+  const effectiveWriteMode = access === "write" ? writeMode : "readonly";
   const server = new McpServer(
     { name: TEMPLATE_NAME, version: TEMPLATE_VERSION },
     {
@@ -167,7 +172,7 @@ export function buildMcpServer(repository: MarkdownRepository, writeMode: "reado
         view: "dashboard" as const,
         appName,
         generatedAt: new Date().toISOString(),
-        writeMode,
+        writeMode: effectiveWriteMode,
         totals,
         standardRecordTypes,
         records: records.map((record) => ({
@@ -319,7 +324,7 @@ export function buildMcpServer(repository: MarkdownRepository, writeMode: "reado
     async ({ type, filename }) => text(repository.getDestination(type, filename)),
   );
 
-  server.registerTool(
+  if (access === "write") server.registerTool(
     "create_record",
     {
       title: "Create a Markdown record",
@@ -342,7 +347,7 @@ export function buildMcpServer(repository: MarkdownRepository, writeMode: "reado
     },
   );
 
-  server.registerTool(
+  if (access === "write") server.registerTool(
     "import_connector_events",
     {
       title: "Import normalized connector events",

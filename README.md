@@ -38,10 +38,11 @@ MCP_CONTENT_ROOT=./content
 MCP_WRITE_MODE=readonly
 MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],knowledge-mcp
 MCP_LOG_IPS=false
-MCP_AUTH_TOKEN=
+MCP_READ_TOKEN=
+MCP_WRITE_TOKEN=
 ```
 
-Use `readonly` until you deliberately want `create_record` and connector imports to write files. Set a strong bearer token before exposing the endpoint outside a trusted local environment. Production deployments still need an authorization layer that filters every tool and resource read to the caller's permitted records.
+Use `readonly` until you deliberately want writes at all. Set distinct strong bearer tokens before exposing the endpoint outside a trusted local environment. A read token sees only read tools; a write token additionally sees `create_record` and `import_connector_events`. The older `MCP_AUTH_TOKEN` remains a write-token fallback for upgrades. Production deployments that contain mixed private data still need record-level filtering for each caller.
 
 ## Record format
 

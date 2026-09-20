@@ -37,7 +37,8 @@ MCP_APP_NAME=Your Application Name
 MCP_CONTENT_ROOT=./content
 MCP_WRITE_MODE=direct
 MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],knowledge-mcp
-MCP_AUTH_TOKEN=
+MCP_READ_TOKEN=
+MCP_WRITE_TOKEN=
 MCP_LOG_IPS=false
 ```
 
@@ -47,7 +48,7 @@ MCP_LOG_IPS=false
 
 Use `MCP_WRITE_MODE=readonly` when a deployment should expose only read tools. Write tools remain discoverable but return an error instead of changing Markdown.
 
-`MCP_AUTH_TOKEN` gates every route behind `Authorization: Bearer <token>`, with `/healthz` exempt only for loopback callers so the container health check keeps working. Set it whenever the endpoint leaves loopback. It is a single shared secret, so treat it as the outer door rather than as per-user authorization.
+`MCP_READ_TOKEN` grants read-only access. `MCP_WRITE_TOKEN` grants read and write access. Both gate requests through `Authorization: Bearer <token>`, with `/healthz` exempt only for loopback callers so the container health check keeps working. Read clients do not discover write tools. The deprecated `MCP_AUTH_TOKEN` is accepted as a write-token fallback for existing installations. These are scoped shared secrets, not record-level user authorization.
 
 Every request is logged as one line: method, path, status, and duration. Query strings are stripped so a credential passed as a parameter cannot reach the log, and headers and bodies are never logged. Client IP addresses are omitted unless `MCP_LOG_IPS=true`, since on a public deployment they are personal data and the retention policy is the operator's to choose.
 

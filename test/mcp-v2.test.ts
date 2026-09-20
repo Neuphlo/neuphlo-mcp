@@ -69,3 +69,33 @@ test("serves tools over the modern MCP 2026-07-28 protocol", async (t) => {
   assert.equal(firstBlock?.type, "text");
   assert.deepEqual(JSON.parse(firstBlock?.type === "text" ? firstBlock.text : "{}"), { valid: true, issues: [] });
 });
+
+test("read access does not expose write tools", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "neuphlo-mcp-read-protocol-"));
+  const repository = new MarkdownRepository(root);
+  await repository.ensureLayout();
+  const handler = createMcpHandler(() => buildMcpServer(repository, "direct", "read"));
+  const client = new Client(
+    { name: "read-access-test", version: "0.1.0" },
+    { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+  );
+  const transport = new StreamableHTTPClientTransport(new URL("http://test.local/mcp"), {
+    fetch: (url, init) => handler.fetch(new Request(url, init)),
+  });
+
+  t.after(async () => {
+    await client.close();
+    await handler.close();
+    await rm(root, { recursive: true, force: true });
+  });
+
+  await client.connect(transport);
+  const tools = await client.listTools();
+  assert.ok(tools.tools.some((tool) => tool.name === "search"));
+  assert.ok(tools.tools.some((tool) => tool.name === "fetch"));
+  assert.ok(!tools.tools.some((tool) => tool.name === "create_record"));
+  assert.ok(!tools.tools.some((tool) => tool.name === "import_connector_events"));
+
+  const dashboard = await client.callTool({ name: "open_dashboard", arguments: {} });
+  assert.equal((dashboard.structuredContent as { writeMode?: string })?.writeMode, "readonly");
+});
