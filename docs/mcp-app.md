@@ -1,44 +1,24 @@
-# MCP App UI
+# MCP App dashboard
 
-For implementation steps and code examples, see [Authoring MCP UI Views](mcp-ui-authoring.md).
+The template implements the MCP Apps extension. A compatible host discovers `open_dashboard` or `show_knowledge_table`, reads the tool's `_meta.ui.resourceUri`, loads `ui://knowledge-workspace/dashboard-v1.html`, and renders the self-contained component in a sandboxed iframe.
 
-The template implements the official MCP Apps extension. A compatible host discovers `open_dashboard`, sees its `_meta.ui.resourceUri`, reads `ui://knowledge-workspace/dashboard-v1.html`, and renders the returned HTML in a sandboxed iframe.
+The dashboard can:
 
-The user-facing name comes from `MCP_APP_NAME`. It is returned in structured tool data and applied to the dashboard, inline table, resource title, and browser diagnostic page. The technical package/server identity remains stable so branding changes do not break client configuration.
+- show only records and totals in the authenticated principal's readable areas;
+- search and filter accessible Markdown records;
+- display configured writable areas in the creation form;
+- create standard or custom records only inside an authorized area;
+- report vendor-neutral normalized-event input readiness; and
+- render a result-specific table for comparison requests.
 
-## Included workflow
+Area filtering in the UI is presentation only. The server independently filters every read and checks every write. A modified or unsupported client cannot bypass the policy.
 
-- Filter records by updated date and free-text search.
-- Search the current dashboard view.
-- Review totals across signals, insights, decisions, initiatives, releases, and briefs.
-- Check Intercom, HubSpot, Chargebee, and generic connector readiness.
-- Create a standard or custom record through `create_record`.
-- Respect server `readonly` mode by disabling the capture form.
-- Return a compact, horizontally scrollable inline table from `show_knowledge_table` when a user asks to list or compare records.
+Clients without MCP Apps support receive ordinary text and structured JSON results. No UI-only operation is required to retrieve or modify data.
 
-## Result-specific views
-
-The MCP App is the rendering layer for a tool result, not merely a link to a standalone dashboard. For example:
-
-| User request | Tool result in a compatible host |
+| Request | Result |
 |---|---|
-| “Show recent customer insights in a table” | Filtered table with stable IDs, status, owner, updated date, and visibility |
-| “Open the Neuphlo dashboard” | Example dashboard with filters, connector status, and signal capture |
-| Client without MCP Apps support | Text summary and structured JSON fallback |
+| “Open the knowledge dashboard” | Accessible totals, recent records, and permitted write controls |
+| “Show open Work as a table” | Accessible rows with stable IDs, area, status, owner, and date |
+| Client without MCP Apps | Text and structured-data fallback |
 
-Additional views can use the same pattern later: release readiness cards, leadership risk summaries, decision timelines, and connector health tables.
-
-The interface does not access the HTTP server directly. It calls MCP tools through the host's secure `postMessage` bridge, so authentication and future per-user permissions remain enforced on the server side.
-
-## Compatibility
-
-MCP Apps is an extension rather than a requirement of core MCP. The server therefore returns both:
-
-- a short text result for clients without UI support; and
-- structured dashboard data plus the linked MCP App for compatible clients.
-
-The UI resource declares no external network or asset domains. Vite bundles its JavaScript and CSS into one HTML file during `npm run build`.
-
-## Production permission requirement
-
-The prototype UI displays the same records the current server exposes. Before real organizational data is added, authentication and record-level visibility filtering must be implemented in the repository queries and tool handlers. UI filtering alone is never an access-control boundary.
+The HTML, CSS, and client bridge live in `app/`. The server bundles them into `dist/ui/index.html` and serves that file as the MCP App resource. See [MCP UI authoring](mcp-ui-authoring.md) for extension patterns and [area access control](access-control.md) for the security contract.

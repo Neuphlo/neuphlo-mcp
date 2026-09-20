@@ -39,6 +39,7 @@ MCP_WRITE_MODE=direct
 MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],knowledge-mcp
 MCP_READ_TOKEN=
 MCP_WRITE_TOKEN=
+MCP_ACCESS_POLICY_PATH=
 MCP_LOG_IPS=false
 ```
 
@@ -49,6 +50,8 @@ MCP_LOG_IPS=false
 Use `MCP_WRITE_MODE=readonly` when a deployment should expose only read tools. Write tools remain discoverable but return an error instead of changing Markdown.
 
 `MCP_READ_TOKEN` grants read-only access. `MCP_WRITE_TOKEN` grants read and write access. Both gate requests through `Authorization: Bearer <token>`, with `/healthz` exempt only for loopback callers so the container health check keeps working. Read clients do not discover write tools. The deprecated `MCP_AUTH_TOKEN` is accepted as a write-token fallback for existing installations. These are scoped shared secrets, not record-level user authorization.
+
+`MCP_ACCESS_POLICY_PATH` enables individual principals and area-specific grants. See [Area and person access control](docs/access-control.md).
 
 Every request is logged as one line: method, path, status, and duration. Query strings are stripped so a credential passed as a parameter cannot reach the log, and headers and bodies are never logged. Client IP addresses are omitted unless `MCP_LOG_IPS=true`, since on a public deployment they are personal data and the retention policy is the operator's to choose.
 
@@ -64,20 +67,9 @@ A source-code or dependency change requires a rebuild:
 docker compose up -d --build
 ```
 
-## 2. Decide whether to keep the example domain
+## 2. Define your record types and areas
 
-The repository includes an optional knowledge-sharing example:
-
-```text
-Signal → Customer insight → Initiative → Decision → Release → Brief
-```
-
-You may:
-
-- keep the model unchanged;
-- rename and adapt the record types;
-- remove some record types; or
-- replace the module entirely while retaining the MCP, Docker, UI, and testing foundation.
+The starter uses neutral collaboration records: Rooms, Work, Pages, decisions, outcomes, and notes. Keep, remove, or extend them with lowercase custom types. Areas are separately configured data boundaries and require no source-code branch per department.
 
 When changing the model, update these together:
 
@@ -204,7 +196,7 @@ For a new source:
 
 For production synchronization, create a separate worker or scheduled job. Keep broad vendor API credentials away from the public MCP request service when possible.
 
-See [Connector Architecture](docs/connectors.md) for the normalized event contract and Intercom, HubSpot, and Chargebee examples.
+See [Connector Architecture](docs/connectors.md) for the vendor-neutral normalized event contract.
 
 ## 8. Add identity and authorization
 

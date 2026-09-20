@@ -1,6 +1,7 @@
 ---
 id: work-0001
 type: work
+area: shared
 title: Shape this workspace for your business
 status: open
 owner: workspace-owner

@@ -1,6 +1,7 @@
 ---
 id: decision-0001
 type: decision
+area: shared
 title: Keep durable knowledge in Markdown
 status: accepted
 owner: workspace-owner

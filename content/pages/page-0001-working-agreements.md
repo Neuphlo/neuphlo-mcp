@@ -1,6 +1,7 @@
 ---
 id: page-0001
 type: page
+area: shared
 title: Working agreements
 status: current
 owner: workspace-owner

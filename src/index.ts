@@ -4,6 +4,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import path from "node:path";
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { hostHeaderValidation, originValidation, toNodeHandler } from "@modelcontextprotocol/node";
+import { AccessContext, loadAccessPolicy, wildcardAccess } from "./access.js";
 import { buildMcpServer } from "./server.js";
 import { MarkdownRepository } from "./repository.js";
 import { TEMPLATE_NAME, TEMPLATE_VERSION } from "./version.js";
@@ -31,20 +32,24 @@ const readToken = process.env.MCP_READ_TOKEN?.trim() ?? "";
 const writeTokenDigest = writeToken ? createHash("sha256").update(writeToken).digest() : undefined;
 const readTokenDigest = readToken ? createHash("sha256").update(readToken).digest() : undefined;
 const authenticationEnabled = Boolean(writeTokenDigest || readTokenDigest);
+type Credential = { digest: Buffer; access: AccessContext };
+let credentials: Credential[] = [];
+const anonymousAccess = wildcardAccess("anonymous", "write");
 
 if (writeTokenDigest && readTokenDigest && timingSafeEqual(writeTokenDigest, readTokenDigest)) {
   throw new Error("MCP_READ_TOKEN and MCP_WRITE_TOKEN must be different.");
 }
 
-function requestAccess(req: IncomingMessage): "read" | "write" | undefined {
-  if (!authenticationEnabled) return "write";
+function requestAccess(req: IncomingMessage): AccessContext | undefined {
+  if (!authenticationEnabled && credentials.length === 0) return anonymousAccess;
   const header = req.headers.authorization ?? "";
   if (!header.startsWith("Bearer ")) return undefined;
   const presented = header.slice("Bearer ".length).trim();
   if (!presented) return undefined;
   const digest = createHash("sha256").update(presented).digest();
-  if (writeTokenDigest && timingSafeEqual(digest, writeTokenDigest)) return "write";
-  if (readTokenDigest && timingSafeEqual(digest, readTokenDigest)) return "read";
+  for (const credential of credentials) {
+    if (timingSafeEqual(digest, credential.digest)) return credential.access;
+  }
   return undefined;
 }
 
@@ -82,17 +87,37 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
-const repository = new MarkdownRepository(contentRoot);
+const repository = new MarkdownRepository(contentRoot, process.env.MCP_REFERENCE_HASH_KEY?.trim());
 await repository.ensureLayout();
+const policyPath = process.env.MCP_ACCESS_POLICY_PATH?.trim();
+const accessPolicy = await loadAccessPolicy(policyPath ? path.resolve(policyPath) : undefined);
+const defaultArea = accessPolicy?.defaultArea ?? "shared";
+const knownAreas = accessPolicy?.areas.map((area) => area.id) ?? [defaultArea];
+const writeAccess = wildcardAccess("service-write", "write", defaultArea);
+const readAccess = wildcardAccess("service-read", "read", defaultArea);
+credentials = [
+  ...(writeTokenDigest ? [{ digest: writeTokenDigest, access: writeAccess }] : []),
+  ...(readTokenDigest ? [{ digest: readTokenDigest, access: readAccess }] : []),
+  ...(accessPolicy?.principals.map((principal) => ({
+    digest: Buffer.from(principal.tokenSha256, "hex"),
+    access: new AccessContext(principal.id, defaultArea, principal.grants),
+  })) ?? []),
+];
+for (let index = 0; index < credentials.length; index += 1) {
+  if (credentials.slice(index + 1).some((credential) => timingSafeEqual(credentials[index].digest, credential.digest))) {
+    throw new Error("Bearer credentials must be unique across service tokens and access-policy principals.");
+  }
+}
 
-const writeMcpHandler = createMcpHandler(() => buildMcpServer(repository, writeMode, "write"));
-const readMcpHandler = createMcpHandler(() => buildMcpServer(repository, writeMode, "read"));
-const nodeWriteMcpHandler = toNodeHandler(writeMcpHandler, {
-  onerror: (error) => console.error("MCP adapter error", error),
-});
-const nodeReadMcpHandler = toNodeHandler(readMcpHandler, {
-  onerror: (error) => console.error("MCP adapter error", error),
-});
+const contexts = [...new Set([anonymousAccess, readAccess, ...credentials.map((credential) => credential.access)])];
+const mcpHandlers = contexts.map((access) => ({
+  access,
+  handler: createMcpHandler(() => buildMcpServer(repository, writeMode, access, knownAreas)),
+}));
+const nodeHandlers = new Map(mcpHandlers.map(({ access, handler }) => [
+  access,
+  toNodeHandler(handler, { onerror: (error) => console.error("MCP adapter error", error) }),
+]));
 const validateHost = hostHeaderValidation(allowedHosts);
 const validateOrigin = originValidation(allowedHosts);
 const documentationRoutes: Record<string, string> = {
@@ -101,6 +126,8 @@ const documentationRoutes: Record<string, string> = {
   "/docs/mcp-ui-authoring.md": path.resolve(process.cwd(), "docs/mcp-ui-authoring.md"),
   "/docs/mcp-app.md": path.resolve(process.cwd(), "docs/mcp-app.md"),
   "/docs/connectors.md": path.resolve(process.cwd(), "docs/connectors.md"),
+  "/docs/access-control.md": path.resolve(process.cwd(), "docs/access-control.md"),
+  "/docs/privacy.md": path.resolve(process.cwd(), "docs/privacy.md"),
   "/docs/starter-blueprint.md": path.resolve(process.cwd(), "docs/starter-blueprint.md"),
   "/docs/governance.md": path.resolve(process.cwd(), "docs/governance.md"),
   "/content/readme.md": path.resolve(process.cwd(), "content/README.md"),
@@ -164,7 +191,9 @@ const browserHelp = `<!doctype html>
     <a class="card" href="/customizing.md"><h3>Customization manual</h3><p>Complete map for branding, tools, resources, data, connectors, permissions, testing, and deployment.</p></a>
     <a class="card" href="/docs/mcp-ui-authoring.md"><h3>MCP UI authoring</h3><p>Add or adjust inline tables, cards, dashboards, structured results, HTML, CSS, and CSP.</p></a>
     <a class="card" href="/docs/mcp-app.md"><h3>MCP App architecture</h3><p>How the current UI resource, result-specific views, compatibility, and permissions fit together.</p></a>
-    <a class="card" href="/docs/connectors.md"><h3>Connector architecture</h3><p>Normalized ingestion and adapter boundaries for Intercom, HubSpot, Chargebee, and other sources.</p></a>
+    <a class="card" href="/docs/connectors.md"><h3>Connector architecture</h3><p>A vendor-neutral normalized-event boundary for external adapters and automation.</p></a>
+    <a class="card" href="/docs/access-control.md"><h3>Area access control</h3><p>Give each person read or write grants for specific configurable areas.</p></a>
+    <a class="card" href="/docs/privacy.md"><h3>Identifier privacy</h3><p>Keep upstream user and external-system identifiers outside public MCP results.</p></a>
     <a class="card" href="/docs/starter-blueprint.md"><h3>Template blueprint</h3><p>The example Markdown information model, MCP surface, rollout phases, and success measures.</p></a>
     <a class="card" href="/docs/governance.md"><h3>Governance example</h3><p>Ownership, cadence, writing rules, triage outcomes, and definitions of current records.</p></a>
   </div>
@@ -174,7 +203,7 @@ const httpServer = createServer(async (req, res) => {
   const route = routeOf(req.url);
   logRequest(req, res, route);
   const localHealthCheck = route === "/healthz" && isLoopback(req);
-  const access = localHealthCheck ? "read" : requestAccess(req);
+  const access = localHealthCheck ? readAccess : requestAccess(req);
   if (!access) {
     res.writeHead(401, {
       "content-type": "application/json",
@@ -220,19 +249,18 @@ const httpServer = createServer(async (req, res) => {
     return;
   }
   if (!validateHost(req, res) || !validateOrigin(req, res)) return;
-  await (access === "write" ? nodeWriteMcpHandler : nodeReadMcpHandler)(req, res);
+  await nodeHandlers.get(access)!(req, res);
 });
 
 httpServer.listen(port, host, () => {
   console.log(`${appName} MCP listening on http://${host}:${port}/mcp`);
   console.log(`Content root: ${contentRoot}; write mode: ${writeMode}`);
-  console.log(authenticationEnabled ? `Auth: scoped bearer tokens (${readTokenDigest ? "read" : "no read token"}, ${writeTokenDigest ? "write" : "no write token"})` : "Auth: disabled (no bearer tokens set)");
+  console.log(credentials.length ? `Auth: ${credentials.length} scoped bearer credential(s); ${knownAreas.length} area(s)` : "Auth: disabled (no bearer tokens set)");
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
-    readMcpHandler.close();
-    writeMcpHandler.close();
+    for (const { handler } of mcpHandlers) handler.close();
     httpServer.close(() => process.exit(0));
   });
 }

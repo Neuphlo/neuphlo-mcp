@@ -19,6 +19,8 @@ type DashboardData = {
   writeMode: "readonly" | "direct";
   records: DashboardRecord[];
   totals: Record<string, number>;
+  areas: string[];
+  writableAreas: string[];
   connectors: Array<{ id: string; label: string; purpose: string; configured: boolean }>;
 };
 
@@ -43,6 +45,7 @@ const elements = {
   count: document.querySelector<HTMLElement>("#record-count")!,
   connectors: document.querySelector<HTMLElement>("#connectors")!,
   form: document.querySelector<HTMLFormElement>("#record-form")!,
+  recordArea: document.querySelector<HTMLSelectElement>("#record-area")!,
   formStatus: document.querySelector<HTMLElement>("#form-status")!,
   connection: document.querySelector<HTMLElement>("#connection-label")!,
   dashboardView: document.querySelector<HTMLElement>("#dashboard-view")!,
@@ -108,6 +111,9 @@ function renderDashboard(data: DashboardData): void {
       <div><strong>${escapeHtml(connector.label)}</strong><p>${escapeHtml(connector.purpose)}</p></div>
       <small>${connector.configured ? "Ready" : "Adapter planned"}</small>
     </article>`).join("");
+  const selectedArea = elements.recordArea.value;
+  elements.recordArea.innerHTML = data.writableAreas.map((area) => `<option value="${escapeHtml(area)}">${escapeHtml(area)}</option>`).join("");
+  if (data.writableAreas.includes(selectedArea)) elements.recordArea.value = selectedArea;
   elements.form.querySelectorAll("input, textarea, select, button").forEach((control) => {
     (control as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | HTMLButtonElement).disabled = data.writeMode === "readonly";
   });
@@ -182,6 +188,7 @@ elements.form.addEventListener("submit", async (event) => {
       name: "create_record",
       arguments: {
         type: String(values.get("type") ?? "note"),
+        area: String(values.get("area") ?? ""),
         title: String(values.get("title") ?? ""),
         content: String(values.get("content") ?? ""),
         owner: String(values.get("owner") ?? ""),

@@ -40,9 +40,11 @@ MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],knowledge-mcp
 MCP_LOG_IPS=false
 MCP_READ_TOKEN=
 MCP_WRITE_TOKEN=
+MCP_ACCESS_POLICY_PATH=
+MCP_REFERENCE_HASH_KEY=
 ```
 
-Use `readonly` until you deliberately want writes at all. Set distinct strong bearer tokens before exposing the endpoint outside a trusted local environment. A read token sees only read tools; a write token additionally sees `create_record` and `import_connector_events`. The older `MCP_AUTH_TOKEN` remains a write-token fallback for upgrades. Production deployments that contain mixed private data still need record-level filtering for each caller.
+Use `readonly` until you deliberately want writes at all. The global read/write tokens are wildcard service credentials. Set `MCP_ACCESS_POLICY_PATH` to enable individual principals with area-specific grants. See [area and person access control](docs/access-control.md).
 
 ## Record format
 
@@ -50,6 +52,7 @@ Use `readonly` until you deliberately want writes at all. Set distinct strong be
 ---
 id: work-0001
 type: work
+area: shared
 title: Prepare the launch
 status: open
 owner: workspace-owner
@@ -63,7 +66,7 @@ room_id: room-0001
 The Markdown body contains the durable context.
 ```
 
-Required fields are `id`, `type`, `title`, `status`, `owner`, `created`, and `updated`. Frontmatter may contain arbitrary business metadata. Custom record types are stored in a directory matching the type.
+Required fields are `id`, `type`, `area`, `title`, `status`, `owner`, `created`, and `updated`. Frontmatter may contain arbitrary business metadata. New records are stored under `areas/<area>/<type-directory>/`.
 
 ## Compatibility
 
@@ -80,4 +83,4 @@ npm run build
 npm run smoke
 ```
 
-See [CUSTOMIZING.md](CUSTOMIZING.md) for extension guidance and [docs/mcp-ui-authoring.md](docs/mcp-ui-authoring.md) for additional MCP Apps views.
+See [CUSTOMIZING.md](CUSTOMIZING.md) for extension guidance, [docs/access-control.md](docs/access-control.md) for granular authorization, [docs/privacy.md](docs/privacy.md) for identifier protection, and [docs/mcp-ui-authoring.md](docs/mcp-ui-authoring.md) for additional MCP Apps views.

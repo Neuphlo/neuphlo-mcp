@@ -2,7 +2,11 @@
 
 ## Unreleased
 
+## 0.3.0 — 2026-09-20
+
 - Add distinct read-only and read/write bearer credentials with server-enforced tool visibility.
+- Add configurable areas and per-principal read/write grants enforced across tools and resources.
+- Remove named-provider assumptions in favor of a vendor-neutral normalized-event boundary.
 
 ## 0.2.0 — 2026-09-20
 
@@ -16,4 +20,4 @@
 
 ## 0.1.0 — 2026-08-12
 
-Initial Neuphlo MCP Template release with Streamable HTTP, Docker, Markdown-backed resources, MCP Apps UI, content routing and validation, department examples, and connector contracts for Intercom, HubSpot, and Chargebee.
+Initial Neuphlo MCP Template release with Streamable HTTP, Docker, Markdown-backed resources, MCP Apps UI, content routing and validation, department examples, and connector contracts.

@@ -7,6 +7,8 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { buildMcpServer } from "../src/server.js";
 import { MarkdownRepository } from "../src/repository.js";
+import { AccessContext } from "../src/access.js";
+import { publicMarkdown } from "../src/privacy.js";
 
 test("serves tools over the modern MCP 2026-07-28 protocol", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "neuphlo-mcp-protocol-"));
@@ -98,4 +100,99 @@ test("read access does not expose write tools", async (t) => {
 
   const dashboard = await client.callTool({ name: "open_dashboard", arguments: {} });
   assert.equal((dashboard.structuredContent as { writeMode?: string })?.writeMode, "readonly");
+});
+
+test("area grants isolate reads and writes", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "neuphlo-mcp-area-protocol-"));
+  const repository = new MarkdownRepository(root);
+  await repository.createRecord({ type: "note", area: "sales", title: "Sales plan", content: "Sales only", owner: "alice" });
+  await repository.createRecord({ type: "note", area: "support", title: "Support plan", content: "Support only", owner: "bob" });
+  const access = new AccessContext("alice", "shared", [
+    { area: "sales", actions: ["read", "write"] },
+  ]);
+  const handler = createMcpHandler(() => buildMcpServer(repository, "direct", access, ["sales", "support"]));
+  const client = new Client(
+    { name: "area-access-test", version: "0.1.0" },
+    { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+  );
+  const transport = new StreamableHTTPClientTransport(new URL("http://test.local/mcp"), {
+    fetch: (url, init) => handler.fetch(new Request(url, init)),
+  });
+
+  t.after(async () => {
+    await client.close();
+    await handler.close();
+    await rm(root, { recursive: true, force: true });
+  });
+
+  await client.connect(transport);
+  const search = await client.callTool({ name: "search", arguments: { query: "plan" } });
+  const searchData = search.structuredContent as { results: Array<{ title: string }> };
+  assert.deepEqual(searchData.results.map((result) => result.title), ["Sales plan"]);
+
+  const index = await client.readResource({ uri: "knowledge://index" });
+  const indexText = index.contents[0] && "text" in index.contents[0] ? index.contents[0].text : "";
+  assert.match(indexText, /Sales plan/);
+  assert.doesNotMatch(indexText, /Support plan/);
+  await assert.rejects(
+    client.readResource({ uri: "knowledge://records/support-note-0001" }),
+    /not found/i,
+  );
+
+  const hidden = await client.callTool({ name: "fetch", arguments: { id: "support-note-0001" } });
+  assert.equal(hidden.isError, true);
+  assert.match(hidden.content[0]?.type === "text" ? hidden.content[0].text : "", /not found/i);
+
+  const denied = await client.callTool({
+    name: "create_record",
+    arguments: { type: "note", area: "support", title: "Forbidden write", content: "No", owner: "alice" },
+  });
+  assert.equal(denied.isError, true);
+
+  const created = await client.callTool({
+    name: "create_record",
+    arguments: { type: "note", area: "sales", title: "Allowed write", content: "Yes", owner: "alice" },
+  });
+  assert.equal(created.isError, undefined);
+  assert.equal((await repository.search({ areas: ["support"] })).length, 1);
+  assert.equal((await repository.search({ areas: ["sales"] })).length, 2);
+});
+
+test("public reads omit private and external identifiers", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "neuphlo-mcp-private-identifiers-"));
+  const repository = new MarkdownRepository(root, "test-reference-hash-key");
+  const record = await repository.createRecord({
+    type: "note",
+    area: "sales",
+    title: "Imported context",
+    content: "Approved public summary.",
+    owner: "user_internal_123",
+    externalRef: "provider:customer_987",
+  });
+  record.metadata.user_id = "user_internal_123";
+  assert.doesNotMatch(publicMarkdown(record), /user_internal_123/);
+  const access = new AccessContext("alice", "shared", [{ area: "sales", actions: ["read"] }]);
+  const handler = createMcpHandler(() => buildMcpServer(repository, "direct", access, ["sales"]));
+  const client = new Client(
+    { name: "privacy-test", version: "0.1.0" },
+    { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+  );
+  const transport = new StreamableHTTPClientTransport(new URL("http://test.local/mcp"), {
+    fetch: (url, init) => handler.fetch(new Request(url, init)),
+  });
+  t.after(async () => {
+    await client.close();
+    await handler.close();
+    await rm(root, { recursive: true, force: true });
+  });
+
+  await client.connect(transport);
+  const fetched = await client.callTool({ name: "fetch", arguments: { id: record.metadata.id } });
+  const serialized = JSON.stringify(fetched);
+  assert.doesNotMatch(serialized, /user_internal_123/);
+  assert.doesNotMatch(serialized, /customer_987/);
+  assert.doesNotMatch(serialized, /external_ref/i);
+  assert.match(serialized, /Approved public summary/);
+  const privateSearch = await client.callTool({ name: "search", arguments: { query: "user_internal_123" } });
+  assert.deepEqual((privateSearch.structuredContent as { results: unknown[] }).results, []);
 });

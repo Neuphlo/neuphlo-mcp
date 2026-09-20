@@ -1,6 +1,7 @@
 ---
 id: record-0001
 type: note
+area: shared
 title: Replace with a durable title
 status: open
 owner: workspace-owner

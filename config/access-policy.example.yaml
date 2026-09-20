@@ -1,0 +1,44 @@
+version: 1
+defaultArea: shared
+
+areas:
+  - id: shared
+    name: Shared workspace
+  - id: sales
+    name: Sales
+  - id: support
+    name: Support
+  - id: management
+    name: Management
+  - id: development
+    name: Development
+
+# These hashes are examples, not usable credentials. Generate a unique token
+# for each person and store only its lowercase SHA-256 hash here.
+principals:
+  - id: alice@example.com
+    displayName: Alice
+    tokenSha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    grants:
+      - area: sales
+        actions: [read, write]
+      - area: shared
+        actions: [read]
+
+  - id: bob@example.com
+    displayName: Bob
+    tokenSha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    grants:
+      - area: support
+        actions: [read, write]
+      - area: development
+        actions: [read]
+
+  - id: executive@example.com
+    displayName: Executive
+    tokenSha256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+    grants:
+      - area: "*"
+        actions: [read]
+      - area: management
+        actions: [write]

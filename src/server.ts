@@ -2,8 +2,10 @@ import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import * as z from "zod/v4";
+import { AccessContext, wildcardAccess } from "./access.js";
 import { publicConnectorStatus } from "./connectors.js";
 import { MarkdownRepository } from "./repository.js";
+import { publicMarkdown, publicMetadata } from "./privacy.js";
 import { standardRecordTypes } from "./types.js";
 import { TEMPLATE_NAME, TEMPLATE_VERSION } from "./version.js";
 
@@ -55,20 +57,29 @@ function recordSummary(record: Awaited<ReturnType<MarkdownRepository["listRecord
   return {
     id: record.metadata.id,
     type: record.metadata.type,
+    area: record.metadata.area,
     title: record.metadata.title,
     status: record.metadata.status,
     updated: record.metadata.updated,
-    path: record.path,
   };
 }
 
 export function buildMcpServer(
   repository: MarkdownRepository,
   writeMode: "readonly" | "direct",
-  access: "read" | "write" = "write",
+  accessInput: AccessContext | "read" | "write" = "write",
+  knownAreas: string[] = ["shared"],
 ): McpServer {
+  const access = typeof accessInput === "string" ? wildcardAccess(`legacy-${accessInput}`, accessInput) : accessInput;
   const appName = process.env.MCP_APP_NAME?.trim() || "Documentation";
-  const effectiveWriteMode = access === "write" ? writeMode : "readonly";
+  const effectiveWriteMode = access.canWrite ? writeMode : "readonly";
+  const readable = <T extends Awaited<ReturnType<MarkdownRepository["listRecords"]>>[number]>(records: T[]) =>
+    records.filter((record) => access.canRead(record));
+  const writableAreas = access.writableAreas(knownAreas);
+  const searchReadable = async (options: Parameters<MarkdownRepository["search"]>[0]) => {
+    const limit = options.limit ?? 25;
+    return readable(await repository.search({ ...options, limit: 100 })).slice(0, limit);
+  };
   const server = new McpServer(
     { name: TEMPLATE_NAME, version: TEMPLATE_VERSION },
     {
@@ -115,7 +126,7 @@ export function buildMcpServer(
     KNOWLEDGE_INDEX_URI,
     { title: "Markdown record index", mimeType: "application/json" },
     async (uri) => {
-      const records = await repository.listRecords();
+      const records = readable(await repository.listRecords());
       return {
         contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(records.map(recordSummary), null, 2) }],
       };
@@ -135,7 +146,7 @@ export function buildMcpServer(
     "knowledge-record",
     new ResourceTemplate(KNOWLEDGE_RECORD_TEMPLATE, {
       list: async () => ({
-        resources: (await repository.listRecords()).map((record) => ({
+        resources: readable(await repository.listRecords()).map((record) => ({
           uri: recordUri(record.metadata.id),
           name: String(record.metadata.title ?? record.metadata.id),
           mimeType: "text/markdown",
@@ -145,8 +156,8 @@ export function buildMcpServer(
     { title: "Knowledge record", mimeType: "text/markdown" },
     async (uri, variables) => {
       const record = await repository.getById(decodeURIComponent(String(variables.id)));
-      if (!record) throw new Error(`Record not found: ${String(variables.id)}`);
-      return { contents: [{ uri: uri.href, mimeType: "text/markdown", text: record.raw }] };
+      if (!record || !access.canRead(record)) throw new Error(`Record not found: ${String(variables.id)}`);
+      return { contents: [{ uri: uri.href, mimeType: "text/markdown", text: publicMarkdown(record) }] };
     },
   );
 
@@ -162,7 +173,7 @@ export function buildMcpServer(
       _meta: uiToolMeta,
     },
     async ({ since }) => {
-      const records = await repository.search({ since, limit: 100 });
+      const records = await searchReadable({ since, limit: 100 });
       const totals: Record<string, number> = {};
       for (const record of records) {
         const type = String(record.metadata.type ?? "");
@@ -175,6 +186,8 @@ export function buildMcpServer(
         writeMode: effectiveWriteMode,
         totals,
         standardRecordTypes,
+        areas: knownAreas.filter((area) => access.can(area, "read")),
+        writableAreas,
         records: records.map((record) => ({
           ...recordSummary(record),
           sensitivity: record.metadata.sensitivity,
@@ -199,20 +212,21 @@ export function buildMcpServer(
         types: z.array(z.string()).optional(),
         statuses: z.array(z.string()).optional(),
         tags: z.array(z.string()).default([]),
+        areas: z.array(z.string()).optional(),
         since: z.string().optional().describe("Inclusive YYYY-MM-DD updated-date filter."),
         limit: z.number().int().min(1).max(100).default(50),
       }),
       annotations: { readOnlyHint: true },
       _meta: uiToolMeta,
     },
-    async ({ query, types, statuses, tags, since, limit }) => {
-      const records = await repository.search({ query, types, statuses, tags, since, limit });
+    async ({ query, types, statuses, tags, areas, since, limit }) => {
+      const records = await searchReadable({ query, types, statuses, tags, areas, since, limit });
       const rows = records.map((record) => ({
         id: String(record.metadata.id ?? ""),
         title: String(record.metadata.title ?? ""),
         type: String(record.metadata.type ?? ""),
+        area: access.areaOf(record),
         status: String(record.metadata.status ?? ""),
-        owner: String(record.metadata.owner ?? ""),
         updated: String(record.metadata.updated ?? ""),
         sensitivity: String(record.metadata.sensitivity ?? "internal"),
       }));
@@ -225,8 +239,8 @@ export function buildMcpServer(
           { key: "id", label: "ID" },
           { key: "title", label: "Title" },
           { key: "type", label: "Type" },
+          { key: "area", label: "Area" },
           { key: "status", label: "Status" },
-          { key: "owner", label: "Owner" },
           { key: "updated", label: "Updated" },
           { key: "sensitivity", label: "Visibility" },
         ],
@@ -248,7 +262,7 @@ export function buildMcpServer(
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async ({ query }) => {
-      const records = await repository.search({ query, limit: 25 });
+      const records = await searchReadable({ query, limit: 25 });
       return structuredText({
         results: records.map((record) => ({
           id: String(record.metadata.id ?? ""),
@@ -269,13 +283,13 @@ export function buildMcpServer(
     },
     async ({ id }) => {
       const record = await repository.getById(id);
-      if (!record) return { ...text(`Record not found: ${id}`), isError: true };
+      if (!record || !access.canRead(record)) return { ...text(`Record not found: ${id}`), isError: true };
       return structuredText({
         id: String(record.metadata.id ?? id),
         title: String(record.metadata.title ?? record.metadata.id ?? id),
-        text: record.raw,
+        text: publicMarkdown(record),
         url: recordUri(record.metadata.id ?? id),
-        metadata: { ...record.metadata, path: record.path },
+        metadata: publicMetadata(record),
       });
     },
   );
@@ -290,11 +304,12 @@ export function buildMcpServer(
         types: z.array(z.string()).optional(),
         statuses: z.array(z.string()).optional(),
         tags: z.array(z.string()).optional(),
+        areas: z.array(z.string()).optional(),
         since: z.string().optional().describe("Inclusive YYYY-MM-DD updated-date filter."),
         limit: z.number().int().min(1).max(100).default(25),
       }),
     },
-    async (input) => text((await repository.search(input)).map((record) => ({ ...recordSummary(record), excerpt: record.body.slice(0, 400) }))),
+    async (input) => text((await searchReadable(input)).map((record) => ({ ...recordSummary(record), excerpt: record.body.slice(0, 400) }))),
   );
 
   server.registerTool(
@@ -306,31 +321,35 @@ export function buildMcpServer(
     },
     async ({ id }) => {
       const record = await repository.getById(id);
-      return record ? text(record.raw) : { ...text(`Record not found: ${id}`), isError: true };
+      return record && access.canRead(record) ? text(publicMarkdown(record)) : { ...text(`Record not found: ${id}`), isError: true };
     },
   );
 
-  server.registerTool(
+  if (access.canWrite) server.registerTool(
     "get_content_destination",
     {
       title: "Get the Markdown content destination",
       description: "Return the configured content root and correct subfolder for a record type before creating a file.",
       inputSchema: z.object({
         type: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        area: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         filename: z.string().regex(/^[a-z0-9][a-z0-9-]*\.md$/).optional(),
       }),
       annotations: { readOnlyHint: true },
     },
-    async ({ type, filename }) => text(repository.getDestination(type, filename)),
+    async ({ type, area, filename }) => access.can(area, "write")
+      ? text(repository.getDestination(type, area, filename))
+      : { ...text("Area is unavailable for writing."), isError: true },
   );
 
-  if (access === "write") server.registerTool(
+  if (access.canWrite) server.registerTool(
     "create_record",
     {
       title: "Create a Markdown record",
       description: "Create a record using a standard collaboration type or a custom business type.",
       inputSchema: z.object({
         type: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).describe("Examples: room, work, page, decision, outcome, note, or a custom type."),
+        area: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).describe("Configured area that will own this record."),
         title: z.string().min(3).max(140),
         content: z.string().min(1).max(100_000),
         owner: z.string().min(1),
@@ -342,18 +361,20 @@ export function buildMcpServer(
     },
     async (input) => {
       if (writeMode === "readonly") return { ...text("Server is running in readonly mode."), isError: true };
+      if (!access.can(input.area, "write")) return { ...text("Area is unavailable for writing."), isError: true };
       const record = await repository.createRecord(input);
       return text({ created: recordSummary(record), resource: recordUri(record.metadata.id) });
     },
   );
 
-  if (access === "write") server.registerTool(
+  if (access.canWrite) server.registerTool(
     "import_connector_events",
     {
       title: "Import normalized connector events",
       description: "Import deduplicated events from external systems as neutral Markdown notes.",
       inputSchema: z.object({
         connector: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,39}$/),
+        area: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         owner: z.string().min(1),
         sensitivity: z.enum(["internal", "restricted"]).default("internal"),
         events: z.array(z.object({
@@ -366,9 +387,10 @@ export function buildMcpServer(
       }),
       annotations: { destructiveHint: false, idempotentHint: true },
     },
-    async ({ connector, events, owner, sensitivity }) => {
+    async ({ connector, area, events, owner, sensitivity }) => {
       if (writeMode === "readonly") return { ...text("Server is running in readonly mode."), isError: true };
-      const result = await repository.importConnectorEvents(connector, events, owner, sensitivity);
+      if (!access.can(area, "write")) return { ...text("Area is unavailable for writing."), isError: true };
+      const result = await repository.importConnectorEvents(connector, area, events, owner, sensitivity);
       return text({
         created: result.created.map(recordSummary),
         skippedAsExisting: result.existing.map(recordSummary),
@@ -385,7 +407,7 @@ export function buildMcpServer(
       annotations: { readOnlyHint: true },
     },
     async () => {
-      const issues = await repository.validate();
+      const issues = await repository.validate(readable(await repository.listRecords()));
       return text({ valid: issues.length === 0, issues });
     },
   );
@@ -398,11 +420,12 @@ export function buildMcpServer(
       inputSchema: z.object({
         since: z.string().describe("Inclusive YYYY-MM-DD updated-date filter."),
         types: z.array(z.string()).default([]),
+        areas: z.array(z.string()).default([]),
       }),
       annotations: { readOnlyHint: true },
     },
-    async ({ since, types }) => {
-      const records = await repository.search({ since, types, limit: 100 });
+    async ({ since, types, areas }) => {
+      const records = await searchReadable({ since, types, areas, limit: 100 });
       const lines = records.map(
         (record) => `- **${String(record.metadata.title)}** (${String(record.metadata.id)}, ${String(record.metadata.status)}) — ${recordUri(record.metadata.id)}`,
       );

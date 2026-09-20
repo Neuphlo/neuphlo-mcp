@@ -14,7 +14,7 @@ FROM node:24-alpine AS runtime
 WORKDIR /app
 
 LABEL org.opencontainers.image.title="Neuphlo MCP Template" \
-      org.opencontainers.image.version="0.1.0"
+      org.opencontainers.image.version="0.3.0"
 
 ENV NODE_ENV=production \
     PORT=3000 \

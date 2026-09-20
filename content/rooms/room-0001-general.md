@@ -1,6 +1,7 @@
 ---
 id: room-0001
 type: room
+area: shared
 title: General
 status: active
 owner: workspace-owner
