@@ -34,22 +34,22 @@ Important settings:
 ```env
 MCP_PORT=3000
 MCP_APP_NAME=Your Application Name
-MCP_CONTENT_DIR=./content
-NEUPHLO_MCP_WRITE_MODE=direct
-NEUPHLO_MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],neuphlo-mcp
-NEUPHLO_MCP_AUTH_TOKEN=
-NEUPHLO_MCP_LOG_IPS=false
+MCP_CONTENT_ROOT=./content
+MCP_WRITE_MODE=direct
+MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],knowledge-mcp
+MCP_AUTH_TOKEN=
+MCP_LOG_IPS=false
 ```
 
 `MCP_APP_NAME` is the visible customer/application name. Changing it does not change stable MCP identifiers.
 
-`MCP_CONTENT_DIR` is the host directory mounted into the container. It accepts a repository-relative path such as `./content` or an absolute path such as `/srv/company-knowledge`. Record types are routed to subfolders inside that directory; see [`content/README.md`](content/README.md).
+`MCP_CONTENT_ROOT` is the content directory used by the process. It accepts a repository-relative path such as `./content` or an absolute path such as `/srv/company-knowledge`. Record types are routed to subfolders inside that directory; see [`content/README.md`](content/README.md).
 
-Use `NEUPHLO_MCP_WRITE_MODE=readonly` when a deployment should expose only read tools. The example write tools remain discoverable but return an error instead of changing Markdown.
+Use `MCP_WRITE_MODE=readonly` when a deployment should expose only read tools. Write tools remain discoverable but return an error instead of changing Markdown.
 
-`NEUPHLO_MCP_AUTH_TOKEN` gates every route behind `Authorization: Bearer <token>`, with `/healthz` exempt only for loopback callers so the container health check keeps working. Set it whenever the endpoint leaves loopback. It is a single shared secret, so treat it as the outer door rather than as per-user authorization.
+`MCP_AUTH_TOKEN` gates every route behind `Authorization: Bearer <token>`, with `/healthz` exempt only for loopback callers so the container health check keeps working. Set it whenever the endpoint leaves loopback. It is a single shared secret, so treat it as the outer door rather than as per-user authorization.
 
-Every request is logged as one line: method, path, status, and duration. Query strings are stripped so a credential passed as a parameter cannot reach the log, and headers and bodies are never logged. Client IP addresses are omitted unless `NEUPHLO_MCP_LOG_IPS=true`, since on a public deployment they are personal data and the retention policy is the operator's to choose.
+Every request is logged as one line: method, path, status, and duration. Query strings are stripped so a credential passed as a parameter cannot reach the log, and headers and bodies are never logged. Client IP addresses are omitted unless `MCP_LOG_IPS=true`, since on a public deployment they are personal data and the retention policy is the operator's to choose.
 
 Apply environment changes with:
 
@@ -129,7 +129,7 @@ Resources are also registered in `src/server.ts`:
 ```ts
 server.registerResource(
   "example-index",
-  "neuphlo://examples",
+  "knowledge://examples",
   { title: "Example index", mimeType: "application/json" },
   async uri => ({
     contents: [{
@@ -168,7 +168,7 @@ The minimum UI-linked tool configuration is:
 ```ts
 _meta: {
   ui: {
-    resourceUri: "ui://neuphlo/mcp-template/main.html",
+    resourceUri: "ui://knowledge-workspace/dashboard-v1.html",
   },
 }
 ```
@@ -218,7 +218,7 @@ A production authorization layer should:
 5. record actor, client, reason, and timestamp;
 6. avoid exposing restricted record existence through counts or error messages.
 
-`audiences` controls relevance. `sensitivity` and allowed groups should control access. UI filtering is never permission enforcement.
+Tags and custom metadata can control relevance. `sensitivity` and allowed groups should control access. UI filtering is never permission enforcement.
 
 Private personal Markdown should live outside the configured content root and preferably in a separate repository or storage boundary.
 
@@ -230,17 +230,17 @@ Technical identifiers include:
 
 - npm package name in `package.json` and `package-lock.json`;
 - MCP server name in `src/server.ts`;
-- `ui://neuphlo/mcp-template/...` resource URIs;
-- `neuphlo://...` knowledge resource URIs;
-- tool names such as `open_neuphlo_dashboard`;
+- `ui://knowledge-workspace/...` resource URIs;
+- `knowledge://...` knowledge resource URIs;
+- tool names such as `open_dashboard`;
 - Docker service name in `compose.yaml`;
-- `NEUPHLO_MCP_*` environment-variable names;
+- `MCP_*` environment-variable names;
 - tests, documentation, and smoke-client identity.
 
 Find every branded identifier before and after changing it:
 
 ```bash
-rg -n -i 'neuphlo|NEUPHLO_MCP' \
+rg -n -i 'your-old-project-name' \
   -g '!node_modules/**' \
   -g '!dist/**'
 ```

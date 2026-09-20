@@ -6,7 +6,7 @@ try {
 } catch {}
 
 const endpoint = new URL(process.env.MCP_URL ?? "http://localhost:3000/mcp");
-const authToken = process.env.NEUPHLO_MCP_AUTH_TOKEN?.trim();
+const authToken = process.env.MCP_AUTH_TOKEN?.trim();
 const client = new Client(
   { name: `${TEMPLATE_NAME}-smoke-test`, version: TEMPLATE_VERSION },
   { versionNegotiation: { mode: { pin: "2026-07-28" } } },

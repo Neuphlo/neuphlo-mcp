@@ -77,20 +77,20 @@ The initial MCP server should be deliberately small.
 
 ### Resources
 
-- `neuphlo://index` — navigation and recently changed records
-- `neuphlo://records/{id}` — canonical example records
-- `neuphlo://connectors` — connector catalog and configuration state
+- `knowledge://index` — navigation and recently changed records
+- `knowledge://records/{id}` — canonical records
+- `knowledge://connectors` — connector catalog and configuration state
 
 ### Read tools
 
 - `search_knowledge(query, types, teams, status, since)`
 - `get_related(record_id, relationship_types)`
 - `get_changes(since, audience)`
-- `build_brief(audience, since, product_area)`
+- `build_summary(since, types)`
 
 ### Write tools
 
-- `submit_signal(source, summary, evidence_links, sensitivity)`
+- `create_record(type, title, content, owner, status, tags, sensitivity)`
 - `propose_record(type, fields, links)`
 - `propose_update(record_id, patch, reason)`
 - `triage_signal(signal_id, outcome, links)`

@@ -2,17 +2,17 @@
 
 For implementation steps and code examples, see [Authoring MCP UI Views](mcp-ui-authoring.md).
 
-The Neuphlo MCP Template implements the official MCP Apps extension. A compatible host discovers the `open_neuphlo_dashboard` tool, sees its `_meta.ui.resourceUri`, reads `ui://neuphlo/mcp-template/main.html`, and renders the returned HTML in a sandboxed iframe.
+The template implements the official MCP Apps extension. A compatible host discovers `open_dashboard`, sees its `_meta.ui.resourceUri`, reads `ui://knowledge-workspace/dashboard-v1.html`, and renders the returned HTML in a sandboxed iframe.
 
 The user-facing name comes from `MCP_APP_NAME`. It is returned in structured tool data and applied to the dashboard, inline table, resource title, and browser diagnostic page. The technical package/server identity remains stable so branding changes do not break client configuration.
 
 ## Included workflow
 
-- Filter records by audience and updated date.
+- Filter records by updated date and free-text search.
 - Search the current dashboard view.
 - Review totals across signals, insights, decisions, initiatives, releases, and briefs.
 - Check Intercom, HubSpot, Chargebee, and generic connector readiness.
-- Submit a new signal through the existing `submit_signal` MCP tool.
+- Create a standard or custom record through `create_record`.
 - Respect server `readonly` mode by disabling the capture form.
 - Return a compact, horizontally scrollable inline table from `show_knowledge_table` when a user asks to list or compare records.
 

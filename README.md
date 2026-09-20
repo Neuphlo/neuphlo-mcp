@@ -1,110 +1,82 @@
-# Neuphlo MCP Template
+# neuphlo-mcp
 
-Current release: **0.1.0**. See the [changelog](CHANGELOG.md) for the release scope.
+A reusable MCP 2.x server for shared Markdown knowledge. It gives people and agents a durable source of truth, canonical search/fetch tools, safe optional writes, resources, connector ingestion, and an MCP Apps dashboard. Neuphlo maintains the project; the exposed tools, views, URIs, environment variables, and content model are vendor-neutral.
 
-The Neuphlo starter repository for building modern Model Context Protocol servers with:
+## What ships out of the box
 
-- MCP SDK V2 and the `2026-07-28` protocol revision;
-- Streamable HTTP with stateless legacy compatibility;
-- MCP Apps that render inline tables and dashboards in compatible hosts;
-- Docker and Docker Compose setup;
-- Markdown-backed example resources and write tools;
-- normalized connector examples for Intercom, HubSpot, Chargebee, and future sources;
-- validation, tests, health checks, and a smoke client.
+- Standard collaboration records: Rooms, Work, Pages, decisions, outcomes, and notes.
+- Extensible business records: any safe lowercase type works without a code change.
+- Canonical `search` and `fetch` tools for agent knowledge retrieval.
+- `open_dashboard` and `show_knowledge_table` MCP Apps views, with useful text/JSON fallbacks.
+- `create_record`, `get_record`, `search_knowledge`, `build_summary`, and repository validation.
+- Idempotent normalized event ingestion, with vendor adapters kept outside the knowledge model.
+- `knowledge://index`, `knowledge://records/{id}`, and `knowledge://connectors` resources.
+- Streamable HTTP using the modern MCP `2026-07-28` protocol era.
 
-The included signals, insights, decisions, initiatives, releases, and briefs form an opinionated example module. Replace or simplify them when adapting the starter to another domain.
-
-Start with [Customizing the Neuphlo MCP Template](CUSTOMIZING.md). The focused references cover the [starter blueprint](docs/starter-blueprint.md), [MCP UI authoring](docs/mcp-ui-authoring.md), [MCP App architecture](docs/mcp-app.md), and [connector architecture](docs/connectors.md).
+The collaboration defaults align with the current `neuphlo-web` everyday model while remaining ordinary Markdown concepts. A business can add types such as `incident`, `policy`, `campaign`, or `customer` alongside them.
 
 ## Quick start
 
-```bash
-cp .env.example .env
-docker compose up --build
-```
-
-Choose the name shown to users by editing `.env`:
-
-```env
-MCP_APP_NAME=Your Application Name
-```
-
-Choose where Markdown is stored on the host:
-
-```env
-MCP_CONTENT_DIR=./content
-```
-
-This can be a repository-relative or absolute directory. Docker mounts it at `/data/content`; the server then routes each record type to its designated subfolder. See the [content placement guide](content/README.md) before adding or generating records.
-
-For a clean slate, set `MCP_CONTENT_DIR` to a new empty directory. The server creates the expected folder structure automatically while leaving the included examples available for reference. The [content placement guide](content/README.md#start-with-a-clean-slate) also explains how to remove only the sample records when retaining the default directory.
-
-Then apply it with `docker compose up -d`. No source-code rename is required. The npm package and MCP server retain the technical starter identity, while the diagnostic page, MCP resource title, dashboard, and inline table use `MCP_APP_NAME`.
-
-- MCP endpoint: `http://localhost:3000/mcp`
-- Health endpoint: `http://localhost:3000/healthz`
-- Browser diagnostic: `http://localhost:3000/mcp`
-
-Compose exposes the service on localhost and bind-mounts `content/`, so rebuilding does not remove Markdown records.
-
-Verify modern protocol negotiation, tool discovery, and repository validation:
+Requires Node.js 22 or newer.
 
 ```bash
 npm install
+cp .env.example .env
+npm run build
+npm test
+npm start
+```
+
+The default endpoint is `http://localhost:3000/mcp`. The landing page is available at `http://localhost:3000/`.
+
+## Configuration
+
+```dotenv
+MCP_PORT=3000
+MCP_APP_NAME=Documentation
+MCP_CONTENT_ROOT=./content
+MCP_WRITE_MODE=readonly
+MCP_ALLOWED_HOSTS=localhost,127.0.0.1,[::1],knowledge-mcp
+MCP_LOG_IPS=false
+MCP_AUTH_TOKEN=
+```
+
+Use `readonly` until you deliberately want `create_record` and connector imports to write files. Set a strong bearer token before exposing the endpoint outside a trusted local environment. Production deployments still need an authorization layer that filters every tool and resource read to the caller's permitted records.
+
+## Record format
+
+```markdown
+---
+id: work-0001
+type: work
+title: Prepare the launch
+status: open
+owner: workspace-owner
+created: 2026-09-20T00:00:00.000Z
+updated: 2026-09-20T00:00:00.000Z
+sensitivity: internal
+tags: [launch]
+room_id: room-0001
+---
+
+The Markdown body contains the durable context.
+```
+
+Required fields are `id`, `type`, `title`, `status`, `owner`, `created`, and `updated`. Frontmatter may contain arbitrary business metadata. Custom record types are stored in a directory matching the type.
+
+## Compatibility
+
+The server registers MCP Apps resources using `_meta.ui.resourceUri` and retains the legacy flat metadata key for compatible hosts. Clients without UI support still receive useful text and structured content. The canonical `search`/`fetch` pair follows the company-knowledge convention used by ChatGPT integrations.
+
+`neuphlo-web` can register this server as an external MCP service, discover its tools/resources, invoke tools, and read resources. Neuphlo's own workspace MCP endpoint remains responsible for authenticated native operations such as reading Rooms or creating Work; this reusable server does not pretend a Markdown directory has those backend permissions.
+
+## Development
+
+```bash
+npm run check
+npm test
+npm run build
 npm run smoke
 ```
 
-Stop the stack with `docker compose down`. For development without Docker, run `npm install` followed by `npm run dev`.
-
-The server reads `.env` itself, so `npm run dev` and `npm start` pick up the same file Compose uses. Real environment variables take precedence over the file, and `MCP_ENV_FILE` points at a different one.
-
-## Bearer token authentication
-
-Set `NEUPHLO_MCP_AUTH_TOKEN` to require `Authorization: Bearer <token>` on every route. Unauthenticated requests get a `401` with a `WWW-Authenticate` header, and the token is compared as a SHA-256 digest so the check does not leak length or content through timing.
-
-`/healthz` is the one exception, and only from loopback: the container health check reaches it over `127.0.0.1` inside the container, while proxied and published traffic arrives from the bridge network and still needs the token. An exposed deployment therefore reveals nothing through the health endpoint.
-
-```bash
-openssl rand -hex 32
-```
-
-Leave the variable empty and the server accepts every request, which is only appropriate for a loopback-bound development run. Set it before putting the endpoint on any network. `npm run smoke` reads the same variable and sends the header for you.
-
-A single shared token authenticates the caller but says nothing about which records they may read. Per-user identity and record-level authorization still have to be added before real data goes in.
-
-## Starter capabilities
-
-- MCP Apps: `open_neuphlo_dashboard` returns the example dashboard and `show_knowledge_table` returns a result-specific inline table.
-- Resources: bundled MCP App HTML, Markdown index, individual records, and connector catalog.
-- Read tools: `search_knowledge`, `get_record`, `validate_repository`, and `build_brief`.
-- Write tools: `submit_signal` and idempotent `import_connector_events`.
-- Prompt: `triage-signals`.
-- Storage: human-readable Markdown with YAML frontmatter.
-
-Clients without MCP Apps support receive ordinary text and structured JSON results. The UI is bundled into one self-contained HTML resource with no separate web server or external scripts.
-
-## Repository layout
-
-```text
-app/                 MCP App source
-content/             Example Markdown records and templates
-docs/                Architecture and customization guidance
-scripts/             Smoke client
-src/                 MCP server and Markdown repository
-test/                Protocol and repository tests
-Dockerfile           Production image
-compose.yaml         Local starter stack
-```
-
-## Customize the starter
-
-1. Set `MCP_APP_NAME` for user-facing branding; change protocol identifiers in `src/server.ts` only if your integration requires it.
-2. Replace the example record types and templates under `content/`.
-3. Adapt the MCP App in `app/` to the structured results your tools return.
-4. Remove unused connector descriptors or add isolated adapter services.
-5. Add authentication and server-side authorization before importing real data.
-6. Prefer proposal/review writes or `NEUPHLO_MCP_WRITE_MODE=readonly` in shared environments.
-
-The example content workflow uses stable IDs, ownership, review dates, audiences, domains, and sensitivity metadata to demonstrate patterns—not to prescribe a universal information model.
-
-For step-by-step instructions on changing the existing HTML or adding a new inline table, card, chart, or dedicated `ui://` resource, see [Authoring MCP UI Views](docs/mcp-ui-authoring.md).
+See [CUSTOMIZING.md](CUSTOMIZING.md) for extension guidance and [docs/mcp-ui-authoring.md](docs/mcp-ui-authoring.md) for additional MCP Apps views.

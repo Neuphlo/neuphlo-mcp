@@ -38,7 +38,7 @@ The MCP tool combines `connector` and `externalId` into an immutable reference s
 
 The server currently provides:
 
-- `neuphlo://connectors` to list connector capabilities and configuration status.
+- `knowledge://connectors` to list connector capabilities and configuration status.
 - `import_connector_events` to ingest up to 100 normalized events per call.
 - Source URLs, connector tags, timestamps, and external IDs in signal frontmatter.
 - Deduplication across repeat imports.

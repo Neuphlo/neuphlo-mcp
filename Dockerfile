@@ -20,8 +20,8 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0 \
     MCP_APP_NAME="Documentation" \
-    NEUPHLO_MCP_CONTENT_ROOT=/data/content \
-    NEUPHLO_MCP_WRITE_MODE=direct
+    MCP_CONTENT_ROOT=/data/content \
+    MCP_WRITE_MODE=direct
 
 RUN addgroup -S mcp && adduser -S -G mcp -u 10001 mcp
 

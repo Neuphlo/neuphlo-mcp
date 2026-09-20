@@ -12,24 +12,12 @@
         <div>
           <p class="eyebrow">Workspace</p>
           <h1>Documentation</h1>
-          <p class="subtitle">An example Markdown workflow with resources, tools, connectors, and inline MCP App views.</p>
+          <p class="subtitle">A shared Markdown workspace for people and agents, with extensible record types and inline MCP App views.</p>
         </div>
         <div class="connection"><span></span><strong id="connection-label">Connecting</strong></div>
       </header>
 
       <section class="controls" aria-label="Dashboard filters">
-        <label>
-          Audience
-          <select id="audience">
-            <option value="all">Everyone</option>
-            <option value="support">Support</option>
-            <option value="sales">Sales</option>
-            <option value="marketing">Marketing</option>
-            <option value="product">Product</option>
-            <option value="engineering">Engineering</option>
-            <option value="leadership">Leadership</option>
-          </select>
-        </label>
         <label>
           Changed since
           <input id="since" type="date" />
@@ -70,17 +58,18 @@
             <div class="panel-heading">
               <div>
                 <p class="eyebrow">Capture</p>
-                <h2>New signal</h2>
+                <h2>New record</h2>
               </div>
             </div>
-            <form id="signal-form">
-              <label>Title<input name="title" required minlength="3" maxlength="140" placeholder="What did we observe?" /></label>
-              <label>Summary<textarea name="summary" required minlength="3" maxlength="5000" rows="4" placeholder="Keep facts separate from interpretation"></textarea></label>
+            <form id="record-form">
+              <label>Type<select name="type"><option>work</option><option>page</option><option>decision</option><option>outcome</option><option>note</option><option>room</option></select></label>
+              <label>Title<input name="title" required minlength="3" maxlength="140" placeholder="A clear, durable title" /></label>
+              <label>Content<textarea name="content" required minlength="1" maxlength="100000" rows="4" placeholder="Write Markdown here"></textarea></label>
               <div class="form-row">
-                <label>Source<select name="sourceType"><option>support</option><option>sales</option><option>marketing</option><option>research</option><option>internal</option></select></label>
+                <label>Status<input name="status" required value="open" /></label>
                 <label>Owner<input name="owner" required value="workspace-owner" /></label>
               </div>
-              <button class="button primary" type="submit">Add to triage</button>
+              <button class="button primary" type="submit">Create record</button>
               <p id="form-status" class="form-status" role="status"></p>
             </form>
           </section>

@@ -16,17 +16,17 @@ try {
 const port = Number.parseInt(process.env.PORT ?? "3000", 10);
 const host = process.env.HOST ?? "0.0.0.0";
 const appName = process.env.MCP_APP_NAME?.trim() || "Documentation";
-const contentRoot = path.resolve(process.env.NEUPHLO_MCP_CONTENT_ROOT ?? "content");
-const writeMode = process.env.NEUPHLO_MCP_WRITE_MODE === "readonly" ? "readonly" : "direct";
-const allowedHosts = (process.env.NEUPHLO_MCP_ALLOWED_HOSTS ?? "localhost,127.0.0.1,[::1],neuphlo-mcp")
+const contentRoot = path.resolve(process.env.MCP_CONTENT_ROOT ?? "content");
+const writeMode = process.env.MCP_WRITE_MODE === "readonly" ? "readonly" : "direct";
+const allowedHosts = (process.env.MCP_ALLOWED_HOSTS ?? "localhost,127.0.0.1,[::1],knowledge-mcp")
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Invalid PORT: ${process.env.PORT}`);
 
-const logClientIps = process.env.NEUPHLO_MCP_LOG_IPS === "true";
-const authToken = process.env.NEUPHLO_MCP_AUTH_TOKEN?.trim() ?? "";
+const logClientIps = process.env.MCP_LOG_IPS === "true";
+const authToken = process.env.MCP_AUTH_TOKEN?.trim() ?? "";
 const authTokenDigest = authToken ? createHash("sha256").update(authToken).digest() : undefined;
 
 function isAuthorized(req: IncomingMessage): boolean {
@@ -124,7 +124,7 @@ const browserHelp = `<!doctype html>
     <tr><td>Visible application name</td><td><code>MCP_APP_NAME</code> in <code>.env</code></td></tr>
     <tr><td>Add a tool, resource, prompt, or UI result</td><td><code>src/server.ts</code></td></tr>
     <tr><td>Change Markdown record types and templates</td><td><code>src/types.ts</code> and <code>content/_templates/</code></td></tr>
-    <tr><td>Choose where Markdown is stored</td><td><code>MCP_CONTENT_DIR</code> in <code>.env</code></td></tr>
+    <tr><td>Choose where Markdown is stored</td><td><code>MCP_CONTENT_ROOT</code> in <code>.env</code></td></tr>
     <tr><td>Add connector configuration</td><td><code>src/connectors.ts</code>, <code>.env.example</code>, and <code>compose.yaml</code></td></tr>
     <tr><td>Add authentication and access filtering</td><td>HTTP request context plus every tool/resource query</td></tr>
   </tbody></table>
@@ -211,7 +211,7 @@ const httpServer = createServer(async (req, res) => {
 httpServer.listen(port, host, () => {
   console.log(`${appName} MCP listening on http://${host}:${port}/mcp`);
   console.log(`Content root: ${contentRoot}; write mode: ${writeMode}`);
-  console.log(authTokenDigest ? "Auth: bearer token required" : "Auth: disabled (no NEUPHLO_MCP_AUTH_TOKEN set)");
+  console.log(authTokenDigest ? "Auth: bearer token required" : "Auth: disabled (no MCP_AUTH_TOKEN set)");
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {

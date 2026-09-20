@@ -16,7 +16,6 @@ type DashboardData = {
   view: "dashboard";
   appName: string;
   generatedAt: string;
-  audience: string;
   writeMode: "readonly" | "direct";
   records: DashboardRecord[];
   totals: Record<string, number>;
@@ -36,7 +35,6 @@ type AppData = DashboardData | TableData;
 
 const app = new App({ name: "MCP App", version: TEMPLATE_VERSION }, {});
 const elements = {
-  audience: document.querySelector<HTMLSelectElement>("#audience")!,
   since: document.querySelector<HTMLInputElement>("#since")!,
   query: document.querySelector<HTMLInputElement>("#query")!,
   refresh: document.querySelector<HTMLButtonElement>("#refresh")!,
@@ -44,7 +42,7 @@ const elements = {
   records: document.querySelector<HTMLElement>("#records")!,
   count: document.querySelector<HTMLElement>("#record-count")!,
   connectors: document.querySelector<HTMLElement>("#connectors")!,
-  form: document.querySelector<HTMLFormElement>("#signal-form")!,
+  form: document.querySelector<HTMLFormElement>("#record-form")!,
   formStatus: document.querySelector<HTMLElement>("#form-status")!,
   connection: document.querySelector<HTMLElement>("#connection-label")!,
   dashboardView: document.querySelector<HTMLElement>("#dashboard-view")!,
@@ -86,7 +84,8 @@ function renderDashboard(data: DashboardData): void {
   const records = data.records.filter((record) =>
     !query || `${record.id} ${record.type} ${record.title} ${record.excerpt}`.toLocaleLowerCase().includes(query),
   );
-  const statOrder = ["signal", "customer-insight", "decision", "initiative", "release", "brief"];
+  const preferred = ["room", "work", "page", "decision", "outcome", "note"];
+  const statOrder = [...preferred.filter((type) => type in data.totals), ...Object.keys(data.totals).filter((type) => !preferred.includes(type)).sort()];
   elements.stats.innerHTML = statOrder.map((type) => `
     <article class="stat">
       <strong>${data.totals[type] ?? 0}</strong>
@@ -102,7 +101,7 @@ function renderDashboard(data: DashboardData): void {
       <h3>${escapeHtml(record.title)}</h3>
       <p>${escapeHtml(record.excerpt || "No summary available.")}</p>
       <footer><code>${escapeHtml(record.id)}</code><span>${escapeHtml(record.status)}</span><time>${escapeHtml(record.updated)}</time></footer>
-    </article>`).join("") : `<div class="empty"><strong>No matching records</strong><span>Try another audience, date, or search phrase.</span></div>`;
+    </article>`).join("") : `<div class="empty"><strong>No matching records</strong><span>Try another date or search phrase.</span></div>`;
   elements.connectors.innerHTML = data.connectors.map((connector) => `
     <article class="connector">
       <span class="connector-mark ${connector.configured ? "configured" : "planned"}"></span>
@@ -142,9 +141,8 @@ async function refresh(): Promise<void> {
   elements.connection.textContent = "Updating";
   try {
     const result = await app.callServerTool({
-      name: "open_neuphlo_dashboard",
+      name: "open_dashboard",
       arguments: {
-        audience: elements.audience.value,
         since: elements.since.value || undefined,
       },
     });
@@ -170,7 +168,6 @@ app.addEventListener("hostcontextchanged", ({ theme }) => {
 });
 
 elements.refresh.addEventListener("click", refresh);
-elements.audience.addEventListener("change", refresh);
 elements.since.addEventListener("change", refresh);
 elements.query.addEventListener("input", () => {
   window.clearTimeout(Number(elements.query.dataset.timer ?? 0));
@@ -182,26 +179,24 @@ elements.form.addEventListener("submit", async (event) => {
   elements.formStatus.textContent = "Saving…";
   try {
     const result = await app.callServerTool({
-      name: "submit_signal",
+      name: "create_record",
       arguments: {
+        type: String(values.get("type") ?? "note"),
         title: String(values.get("title") ?? ""),
-        summary: String(values.get("summary") ?? ""),
-        sourceType: String(values.get("sourceType") ?? "internal"),
+        content: String(values.get("content") ?? ""),
         owner: String(values.get("owner") ?? ""),
-        evidenceLinks: [],
-        domains: [],
+        status: String(values.get("status") ?? "open"),
         tags: ["submitted-from-ui"],
         sensitivity: "internal",
-        confidence: "medium",
       },
     });
-    if (result.isError) throw new Error("The server rejected the signal.");
+    if (result.isError) throw new Error("The server rejected the record.");
     elements.form.reset();
     elements.form.querySelector<HTMLInputElement>("[name=owner]")!.value = "workspace-owner";
-    elements.formStatus.textContent = "Added to the triage inbox.";
+    elements.formStatus.textContent = "Record created.";
     await refresh();
   } catch (error) {
-    elements.formStatus.textContent = error instanceof Error ? error.message : "Could not save the signal.";
+    elements.formStatus.textContent = error instanceof Error ? error.message : "Could not save the record.";
   }
 });
 

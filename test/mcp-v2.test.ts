@@ -32,31 +32,33 @@ test("serves tools over the modern MCP 2026-07-28 protocol", async (t) => {
   const tools = await client.listTools();
   assert.ok(tools.tools.some((tool) => tool.name === "search_knowledge"));
   assert.ok(tools.tools.some((tool) => tool.name === "show_knowledge_table"));
-  assert.ok(tools.tools.some((tool) => tool.name === "import_connector_events"));
-  const hubTool = tools.tools.find((tool) => tool.name === "open_neuphlo_dashboard");
+  assert.ok(tools.tools.some((tool) => tool.name === "create_record"));
+  assert.ok(tools.tools.some((tool) => tool.name === "search"));
+  assert.ok(tools.tools.some((tool) => tool.name === "fetch"));
+  const hubTool = tools.tools.find((tool) => tool.name === "open_dashboard");
   assert.deepEqual(hubTool?._meta, {
-    ui: { resourceUri: "ui://neuphlo/mcp-template/main.html" },
-    "ui/resourceUri": "ui://neuphlo/mcp-template/main.html",
+    ui: { resourceUri: "ui://knowledge-workspace/dashboard-v1.html" },
+    "ui/resourceUri": "ui://knowledge-workspace/dashboard-v1.html",
   });
 
   const resources = await client.listResources();
-  assert.ok(resources.resources.some((resource) => resource.uri === "ui://neuphlo/mcp-template/main.html"));
-  const appResource = await client.readResource({ uri: "ui://neuphlo/mcp-template/main.html" });
+  assert.ok(resources.resources.some((resource) => resource.uri === "ui://knowledge-workspace/dashboard-v1.html"));
+  const appResource = await client.readResource({ uri: "ui://knowledge-workspace/dashboard-v1.html" });
   const appContent = appResource.contents[0];
   assert.equal(appContent?.mimeType, "text/html;profile=mcp-app");
   assert.ok(appContent && "text" in appContent);
   assert.match(appContent && "text" in appContent ? appContent.text : "", /Documentation/);
 
   const dashboard = await client.callTool({
-    name: "open_neuphlo_dashboard",
-    arguments: { audience: "support" },
+    name: "open_dashboard",
+    arguments: {},
   });
-  assert.equal((dashboard.structuredContent as { audience?: string })?.audience, "support");
+  assert.equal((dashboard.structuredContent as { view?: string })?.view, "dashboard");
   assert.equal((dashboard.structuredContent as { appName?: string })?.appName, "Documentation");
 
   const table = await client.callTool({
     name: "show_knowledge_table",
-    arguments: { audience: "leadership" },
+    arguments: {},
   });
   assert.equal((table.structuredContent as { view?: string })?.view, "knowledge-table");
   assert.ok(Array.isArray((table.structuredContent as { columns?: unknown[] })?.columns));

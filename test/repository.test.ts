@@ -19,23 +19,22 @@ async function fixture() {
   return { root, repository };
 }
 
-test("creates, reads, and searches a signal", async (t) => {
+test("creates, reads, and searches an extensible record", async (t) => {
   const { root, repository } = await fixture();
   t.after(() => rm(root, { recursive: true, force: true }));
 
-  const created = await repository.submitSignal({
+  const created = await repository.createRecord({
+    type: "work",
     title: "Setup is confusing",
-    summary: "Several customers cannot find the workspace configuration.",
-    sourceType: "support",
+    content: "Several people cannot find the workspace configuration.",
     owner: "support-ops",
-    domains: ["onboarding"],
-    tags: ["friction"],
+    tags: ["onboarding", "friction"],
   });
 
-  assert.match(String(created.metadata.id), /^SIG-\d{4}-001$/);
+  assert.equal(created.metadata.id, "work-0001");
   assert.equal((await repository.getById(String(created.metadata.id)))?.metadata.title, "Setup is confusing");
   assert.equal((await repository.search({ query: "workspace configuration" })).length, 1);
-  assert.equal((await repository.search({ domains: ["billing"] })).length, 0);
+  assert.equal((await repository.search({ tags: ["billing"] })).length, 0);
   assert.deepEqual(await repository.validate(), []);
 });
 
@@ -65,14 +64,14 @@ test("routes and validates Markdown destinations", async (t) => {
 
   assert.equal(repository.getDestination("decision", "dec-2026-001-example.md").relativePath, "decisions/dec-2026-001-example.md");
 
-  const created = await repository.submitSignal({
-    title: "Example signal",
-    summary: "A concise observation.",
-    sourceType: "support",
+  const created = await repository.createRecord({
+    type: "note",
+    title: "Example note",
+    content: "A concise observation.",
     owner: "support-ops",
   });
   const misplaced = path.join(root, "decisions", path.basename(created.path));
   await rename(path.join(root, created.path), misplaced);
 
-  assert.match((await repository.validate())[0]?.message ?? "", /belongs in inbox\//);
+  assert.deepEqual(await repository.validate(), []);
 });

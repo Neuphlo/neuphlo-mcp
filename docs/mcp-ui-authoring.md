@@ -190,7 +190,7 @@ Extend `test/mcp-v2.test.ts` to verify:
 const tools = await client.listTools();
 const tool = tools.tools.find(item => item.name === "show_release_readiness");
 assert.deepEqual(tool?._meta, {
-  ui: { resourceUri: "ui://neuphlo/mcp-template/main.html" },
+  ui: { resourceUri: "ui://knowledge-workspace/dashboard-v1.html" },
 });
 
 const result = await client.callTool({
@@ -210,7 +210,7 @@ To add a separate app:
 
 1. Create another HTML entry and TypeScript entry under `app/`.
 2. Update `vite.config.ts` to build it as a self-contained output.
-3. Register a new URI, for example `ui://neuphlo/mcp-template/release.html`.
+3. Register a new URI, for example `ui://knowledge-workspace/custom-view.html`.
 4. Return its bundled HTML through `server.registerResource()`.
 5. Point the corresponding tool's `_meta.ui.resourceUri` to the new URI.
 6. Add resource-discovery and MIME-type tests.
@@ -227,7 +227,7 @@ The app calls tools through the host rather than fetching `/mcp` directly:
 
 ```ts
 const result = await app.callServerTool({
-  name: "submit_signal",
+  name: "create_record",
   arguments: {
     title: "Example",
     summary: "Observed behavior",
