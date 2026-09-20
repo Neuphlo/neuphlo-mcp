@@ -160,14 +160,14 @@ async function refresh(): Promise<void> {
   }
 }
 
-app.ontoolresult = (result) => {
+app.addEventListener("toolresult", (result) => {
   const data = structured(result);
   if (data) render(data);
-};
+});
 
-app.onhostcontextchanged = ({ theme }) => {
+app.addEventListener("hostcontextchanged", ({ theme }) => {
   if (theme) applyDocumentTheme(theme);
-};
+});
 
 elements.refresh.addEventListener("click", refresh);
 elements.audience.addEventListener("change", refresh);
