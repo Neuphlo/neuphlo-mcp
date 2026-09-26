@@ -72,6 +72,51 @@ test("serves tools over the modern MCP 2026-07-28 protocol", async (t) => {
   assert.deepEqual(JSON.parse(firstBlock?.type === "text" ? firstBlock.text : "{}"), { valid: true, issues: [] });
 });
 
+test("search_knowledge advertises a strict read-only schema and preserves its result", async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "neuphlo-mcp-search-schema-"));
+  const repository = new MarkdownRepository(root);
+  await repository.ensureLayout();
+  const handler = createMcpHandler(() => buildMcpServer(repository, "direct"));
+  const client = new Client(
+    { name: "search-schema-test", version: "0.1.0" },
+    { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+  );
+  const transport = new StreamableHTTPClientTransport(new URL("http://test.local/mcp"), {
+    fetch: (url, init) => handler.fetch(new Request(url, init)),
+  });
+
+  t.after(async () => {
+    await client.close();
+    await handler.close();
+    await rm(root, { recursive: true, force: true });
+  });
+
+  await client.connect(transport);
+  const tool = (await client.listTools()).tools.find((candidate) => candidate.name === "search_knowledge");
+  assert.deepEqual(tool?.inputSchema, {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    type: "object",
+    properties: {
+      query: { default: "", type: "string" },
+      types: { type: "array", items: { type: "string" } },
+      statuses: { type: "array", items: { type: "string" } },
+      tags: { type: "array", items: { type: "string" } },
+      areas: { type: "array", items: { type: "string" } },
+      since: { description: "Inclusive YYYY-MM-DD updated-date filter.", type: "string" },
+      limit: { default: 25, type: "integer", minimum: 1, maximum: 100 },
+    },
+    additionalProperties: false,
+  });
+  assert.deepEqual(tool?.annotations, { readOnlyHint: true, openWorldHint: false });
+
+  const before = await repository.listRecords();
+  const result = await client.callTool({ name: "search_knowledge", arguments: {} });
+  const after = await repository.listRecords();
+  assert.deepEqual(after, before);
+  assert.equal(result.isError, undefined);
+  assert.equal(result.content[0]?.type === "text" ? result.content[0].text : undefined, "[]");
+});
+
 test("read access does not expose write tools", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "neuphlo-mcp-read-protocol-"));
   const repository = new MarkdownRepository(root);

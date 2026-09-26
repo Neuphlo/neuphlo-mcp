@@ -299,7 +299,7 @@ export function buildMcpServer(
     {
       title: "Search Markdown records",
       description: "Search canonical Markdown records by text and metadata.",
-      inputSchema: z.object({
+      inputSchema: z.strictObject({
         query: z.string().default(""),
         types: z.array(z.string()).optional(),
         statuses: z.array(z.string()).optional(),
@@ -308,6 +308,7 @@ export function buildMcpServer(
         since: z.string().optional().describe("Inclusive YYYY-MM-DD updated-date filter."),
         limit: z.number().int().min(1).max(100).default(25),
       }),
+      annotations: { readOnlyHint: true, openWorldHint: false },
     },
     async (input) => text((await searchReadable(input)).map((record) => ({ ...recordSummary(record), excerpt: record.body.slice(0, 400) }))),
   );
